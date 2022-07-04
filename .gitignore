@@ -1,0 +1,11 @@
+/dist/
+/lib/
+/node_modules/
+/.vscode
+/yarn.lock
+
+# wasm artifacts
+/wasm/*.wasm
+/wasm/settings.json
+/src/wasm.ts
+/emsdk
