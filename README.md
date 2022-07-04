@@ -5,7 +5,7 @@ This is a toy repo to test/develop proper integration of wasm with typescript de
 - automated wasm builds from npm
 - proper distribution / bundling of wasm modules
 
-Currently only tested on linux.
+Tested on linux.
 
 
 ### Usage
@@ -26,7 +26,7 @@ Now things are ready to use, with `yarn start` browser support can be tested (se
 
 Wasm C/C++ sources reside under `/wasm`. The main build script is `./build.sh`,
 which coordinates compile settings and exports to typescript. The wasm binaries get wrapped
-into a Typescript source file, which can be used normally from Typescript side (see `/src/index.js`).
+into a Typescript source file (as base64), which can be used normally from Typescript side (see `/src/index.js`).
 The wasm integration itself is quite low level, it doesn't use any of emscripten's higher level interfaces,
 instead simply uses exposed memory addresses and functions.
 

@@ -1,16 +1,12 @@
 #!/bin/bash
 
-#################################
-# compile time decoder settings #
-#################################
-
-# EMSCRIPTEN_PATH
-# Path to your emscripten SDK.
-EMSCRIPTEN_PATH=../emsdk/emsdk_env.sh
+#########################
+# compile time settings #
+#########################
 
 # CHUNK_SIZE
-# Maximum size of a single chunk, that can be loaded into the decoder.
-# This has only a tiny impact on the decoder speed, thus we can go with
+# Maximum size of a single chunk, that can be loaded.
+# This has only a tiny impact on the speed, thus we can go with
 # a rather low value (aligned with typical PIPE_BUF values).
 # Use one of 2 ^ (12 .. 16).
 CHUNK_SIZE=16384
@@ -28,7 +24,7 @@ INITIAL_MEMORY=$((1 * 65536))
 ##################
 
 # activate emscripten env
-source $EMSCRIPTEN_PATH
+source ../emsdk/emsdk_env.sh
 
 # simd variant
 emcc -O3 \
@@ -66,13 +62,12 @@ emcc -O3 \
 -mbulk-memory -std=c99 -Wall -Wextra --no-entry convert.c -o convert.wasm
 
 
-#################################
-# export settings to Typescript #
-#################################
+#####################################
+# export settings and compile units #
+#####################################
 
-# export compile time settings
 # The settings are evaluates by the script in /bin/wrap_wasm.js and
-# expected to be in json format.
+# expected to be in JSON.
 # Entries starting with BYTES* are handled as wasm files,
-# that should be added to the typescript source file.
+# that are automatically added to the typescript source file.
 echo "{\"CHUNK_SIZE\": $CHUNK_SIZE, \"BYTES\": \"convert.wasm\", \"BYTES_SIMD\": \"convert-simd.wasm\"}" > settings.json
