@@ -17,10 +17,10 @@ cd wasm-dummy
 # if you have a working emsdk v2, maybe place a symlink
 ln -s /path/to/emsdk .
 # install dependencies (pulls emsdk, if not symlinked)
-yarn
+npm install
 ```
 
-Now things are ready to use, with `yarn start` browser support can be tested (see console.log).
+Now things are ready to use, with `npm start` browser support can be tested (see console.log).
 
 ### Wasm integration
 
