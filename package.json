@@ -10,7 +10,7 @@
     "start": "npm run bundle && http-server",
     "prepublish": "npm run build",
     "build-wasm": "bin/install_emscripten.sh && cd wasm && ./build.sh && cd .. && node bin/wrap_wasm.js",
-    "bundle": "tsc --project tsconfig.json && webpack",
+    "bundle": "tsc --project tsconfig.json && node lib/emwasm/cli.js lib/inline.js && webpack",
     "clean": "rm -rf lib dist src/wasm.ts wasm/*.wasm wasm/settings.json",
     "build": "npm run build-wasm && npm run tsc && npm run bundle"
   },

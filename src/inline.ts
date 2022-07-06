@@ -1,33 +1,14 @@
-/**
- * EM_WASM decl stuff (to be moved into own lib)
- */
-declare const _emwasm_compiler: any;
-
-function EmWasm<T>(definition: T) {
-  if (typeof _emwasm_compiler !== 'undefined') {
-    _emwasm_compiler.add_unit(definition);
-  }
-  throw new Error('must call emwasm compile');
-  return definition;
-}
-/* end: EM_WASM decl stuff */
-
-/**
- * TODO:
- * - morph EmWasm return type, so TS finds proper types
- * - support several build flags
- * - support multiple compile units for different feature set (eg. scalar vs. simd)
- * - different embed styles: inline-immediate, inline-sync
- * - ES6 module vs require/UMD support
- */
+import { EmWasmInstance } from './emwasm/definitions';
 
 
-// ##EM_WASM## unit
-const unit = EmWasm({
+const unit = EmWasmInstance( /* ##EMWASM## */ {
   name: 'unit',
-  defines: {CHUNK_SIZE: 4096},
+  mode: 'sync',
+  srctype: 'C',
+  compile: {
+    defines: {CHUNK_SIZE: 4096}
+  },
   exports: {
-    memory: new WebAssembly.Memory({initial: 0, maximum: 0}),
     chunk_addr: () => 0,
     target_addr: () => 0,
     convert: (length: number) => 0
@@ -50,11 +31,12 @@ const unit = EmWasm({
     return dst - TARGET;
   }
   `
-});
-// ##END_EM_WASM## unit
+} /* ##\EMWASM## */ );
+
 
 const CHUNK = new Uint8Array(unit.exports.memory.buffer, unit.exports.chunk_addr(), unit.defines.CHUNK_SIZE);
 const TARGET = new Uint8Array(unit.exports.memory.buffer, unit.exports.target_addr(), unit.defines.CHUNK_SIZE / 2);
+
 export function convert16BitTo8BitData(data: Uint16Array, target?: Uint8Array): Uint8Array {
   const view = new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
   const end = data.byteLength;
@@ -78,22 +60,38 @@ console.log(
   ]))
 );
 
+
+// with imported functions
 const env = {jsadd: (a: number, b: number) => a + b}
 
-// ##EM_WASM## second
-const second = EmWasm({
-  name: 'second',
-  defines: {},
-  imports: 'env',
-  exports: {
-    memory: new WebAssembly.Memory({initial: 0, maximum: 0}),
-    add: (a: number, b: number) => 0
-  },
-  code: `
-  int jsadd(int a, int b);
-  int add(int a, int b) {
-    return jsadd(a, b);
+
+export const second = EmWasmInstance(
+  // ##EMWASM##
+  {
+    name: 'second',
+    mode: 'async',
+    srctype: 'C',
+    imports: 'env',
+    exports: {
+      add: (a: number, b: number) => 0
+    },
+    code: `
+    // forward decl w'o real impl (marked for import by emscripten)
+    int jsadd(int a, int b);
+
+    // some silly function
+    int add(int a, int b) {
+      return jsadd(a, b);
+    }
+    `
   }
-  `
-});
-// ##END_EM_WASM## second
+  // ##\EMWASM##
+);
+
+async function bla() {
+  const s = await second;
+  console.log(s);
+  console.log((await second).exports.add(11, 22));
+}
+bla();
+

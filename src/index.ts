@@ -126,3 +126,6 @@ export function convert16BitTo8BitData(data: Uint16Array, target?: Uint8Array): 
   }
   return new Uint8Array(result.buffer, 0, data.length);
 }
+
+
+export { second } from './inline';
