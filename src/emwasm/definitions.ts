@@ -123,21 +123,27 @@ declare const _emwasmCtx: _IEmWasmCtx;
  * in a TS source file. Ideally the source module has no complicated imports
  * (close to leaves in dependency tree, no cycling).
  *
- * The source definition comes with some restrictions:
- * - definition must be surrounded by special sentinel comments as of
+ * `EmWasm` and source definition come with some restrictions:
+ * - A definition must be surrounded by special sentinel comments as of
  *
  *      `EmWasm( /* ##EMWASM## *\/ {..your definition goes here..} /* ##\EMWASM## *\/ )`
  *
  *   (without the \ after the *). Without those sentinels the compiler script will
- *   not find the corresponding code blocks (might be lifted in the future).
+ *   not find the corresponding code blocks. `EmWasm` with the sentinels currently
+ *   operates as a source macro, therefore every source definition must have its own
+ *   `EmWasm` + sentinels call surrounding it literally in source. Any sort of
+ *   function or identifier indirection will either not compile or scramble the JS source.
  * - Values provided to the source definition must be final and not change later at runtime.
- *   This results from the fact, that most values get compiled-in and cannot be altered
- *   anymore on the wasm binary.
+ *   This results from the fact, that most values get compiled into the wasm binary and cannot
+ *   be altered anymore.
+ *
+ * Some of the restrictions above might get lifted with more advanced AST parsing
+ * in the future.
  *
  * 2. compile stage
  * After TS compilation run `emwasm` on files containing `EmWasm` calls.
- * `emwasm` grabs the source definitions, compiles them into wasm binaries and
- * replaces the source definitions with base64 encoded runtime definitions.
+ * `emwasm` grabs the source definitions from partial execution, compiles them into
+ * wasm binaries and replaces the source definitions with base64 encoded runtime definitions.
  * Note that this currently happens inplace, thus the original file content gets overwritten.
  * Alternatively run `emwasm` in watch mode with `emwasm -w glob*pattern`.
  * Note: `emwasm` does not yet work with ES6 modules.
