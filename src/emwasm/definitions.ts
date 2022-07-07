@@ -1,137 +1,183 @@
 /**
- * TODO:
- * - ES6 module vs require/UMD support
+ * Output type of `EmWasm`.
+ * Determines whether to return bytes, a wasm module or a wasm instance.
+ * Returns for async corresponding promises.
  */
-
-
 export const enum OutputType {
-  DEFAULT = 0,
   INSTANCE = 0,
   MODULE = 1,
   BYTES = 2
 }
 
 
+/**
+ * Whether `EmWasm` returns the requested type sync or async (promise).
+ * Note that synchronous processing of wasm modules/instance is highly restricted
+ * in browsers' main JS context (works only reliable in nodejs or a web worker).
+ */
 export const enum OutputMode {
   ASYNC = 0,
   SYNC = 1
 }
 
 
-export interface TDefinition {
+/**
+ * Wasm source definition, holds all relevant compiler info.
+ */
+export interface IWasmDefinition {
+  // Name of the wasm target, should be unique.
   name: string,
+  // Type determines, whether to provide bytes | module | instance at runtime.
   type: OutputType,
+  // Sync (discouraged) vs. async wasm bootstrapping at runtime.
   mode: OutputMode,
+  // custom compiler settings
   compile?: {
+    // Custom cmdline defines, e.g. {ABC: 123} provided as -DABC=123 to the compiler.
     defines?: {[key: string]: string | number},
+    // Additional include paths, should be absolute. (TODO...)
     include?: string[],
+    // Additional source files (copied over). (TODO...)
     sources?: string[],
-    libs?: string[],
+    // FIXME: check support for -lxy with wasm
+    //libs?: string[],
+    // Custom cmdline switches, overriding any from above. (TODO...)
     switches?: string[],
   }
+  // whether to treat `code` below as C or C++ source.
   srctype: 'C' | 'C++',
+  // Exported wasm functions, for proper TS typing simply stub them.
   exports: {[key: string]: Function},
+  // Name of the env import object (must be visible at runtime). Only used for instance.
   imports?: string,
+  // Inline source code (C or C++).
   code: string
 }
-interface TDefinitionSync extends TDefinition {
+interface IWasmDefinitionSync extends IWasmDefinition {
   mode: OutputMode.SYNC
 }
-interface TDefinitionAsync extends TDefinition {
+interface IWasmDefinitionAsync extends IWasmDefinition {
   mode: OutputMode.ASYNC
 }
-interface TDefinitionSyncBytes extends TDefinitionSync {
+interface IWasmDefinitionSyncBytes extends IWasmDefinitionSync {
   type: OutputType.BYTES;
 }
-interface TDefinitionSyncModule extends TDefinitionSync {
+interface IWasmDefinitionSyncModule extends IWasmDefinitionSync {
   type: OutputType.MODULE;
 }
-interface TDefinitionSyncInstance extends TDefinitionSync {
+interface IWasmDefinitionSyncInstance extends IWasmDefinitionSync {
   type: OutputType.INSTANCE;
 }
-interface TDefinitionAsyncBytes extends TDefinitionAsync {
+interface IWasmDefinitionAsyncBytes extends IWasmDefinitionAsync {
   type: OutputType.BYTES;
 }
-interface TDefinitionAsyncModule extends TDefinitionAsync {
+interface IWasmDefinitionAsyncModule extends IWasmDefinitionAsync {
   type: OutputType.MODULE;
 }
-interface TDefinitionAsyncInstance extends TDefinitionAsync {
+interface IWasmDefinitionAsyncInstance extends IWasmDefinitionAsync {
   type: OutputType.INSTANCE;
 }
 
 
-export interface WasmInstance<T extends TDefinition> extends WebAssembly.Instance {
+// extends WebAssembly.Instance with proper exports typings
+export interface WasmInstance<T extends IWasmDefinition> extends WebAssembly.Instance {
   exports: {memory: WebAssembly.Memory} & T['exports'];
-  defines: T['compile'] extends {defines: any} ? T['compile']['defines'] : undefined;
 }
 
-
+// tiny compile ctx for emwasm
 export interface _IEmWasmCtx {
-  addUnit(def: TDefinition): void;
+  // adds definition for compile evaluation and raises
+  add(def: IWasmDefinition): void;
 }
 
 
-// helper to decode base64
-function _dec(s: string) {
+// runtime helper - decode base64
+function _dec(s: string): Uint8Array {
   if (typeof Buffer !== 'undefined') return Buffer.from(s, 'base64');
   const bs = atob(s);
   const r = new Uint8Array(bs.length);
   for (let i = 0; i < r.length; ++i) r[i] = bs.charCodeAt(i);
   return r;
 }
-
-// helper to add defines to instance
-function addDefines<T extends TDefinition>(inst: WasmInstance<T>, defines: any) {
-  if (defines) {
-    inst.defines = defines;
-  }
-  return inst;
+// runtime helper - set imports conditionally
+function _env(env: any): {env: any} | undefined {
+  return env ? {env: env} : undefined
+}
+// runtime helper - create response object
+function _res(d: string): Response {
+  return new Response(_dec(d), {status: 200, headers: {'Content-Type': 'application/wasm'}})
 }
 
 
-// compiler ctx helper (only defines during compile run)
+// compiler ctx helper (only defined during compile run from emwasm)
 declare const _emwasmCtx: _IEmWasmCtx;
 
 
 /**
- * Generate inline wasm from a definition.
+ * Inline wasm from a source definition.
+ *
+ * The processing happens in several stages:
+ *
+ * 1. coding stage
+ * Place a `EmWasm` call with a valid wasm source definition (see `IWasmDefinition` above)
+ * in a TS source file. Ideally the source module has no complicated imports
+ * (close to leaves in dependency tree, no cycling).
+ *
+ * The source definition comes with some restrictions:
+ * - definition must be surrounded by special sentinel comments as of
+ *
+ *      `EmWasm( /* ##EMWASM## *\/ {..your definition goes here..} /* ##\EMWASM## *\/ )`
+ *
+ *   (without the \ after the *). Without those sentinels the compiler script will
+ *   not find the corresponding code blocks (might be lifted in the future).
+ * - Values provided to the source definition must be final and not change later at runtime.
+ *   This results from the fact, that most values get compiled-in and cannot be altered
+ *   anymore on the wasm binary.
+ *
+ * 2. compile stage
+ * After TS compilation run `emwasm` on files containing `EmWasm` calls.
+ * `emwasm` grabs the source definitions, compiles them into wasm binaries and
+ * replaces the source definitions with base64 encoded runtime definitions.
+ * Note that this currently happens inplace, thus the original file content gets overwritten.
+ * Alternatively run `emwasm` in watch mode with `emwasm -w glob*pattern`.
+ * Note: `emwasm` does not yet work with ES6 modules.
+ *
+ * 3. runtime stage
+ * At runtime `EmWasm` decodes the base64 wasm data and returns the requested output type
+ * (bytes, module or instance; as promises for async mode).
+ * If the compilation step was skipped in between, `EmWasm` will throw an error.
  */
-export function EmWasm(def: TDefinitionSyncBytes): Uint8Array;
-export function EmWasm(def: TDefinitionAsyncBytes): Promise<Uint8Array>;
-export function EmWasm(def: TDefinitionSyncModule): WebAssembly.Module;
-export function EmWasm(def: TDefinitionAsyncModule): Promise<WebAssembly.Module>;
-export function EmWasm<T extends TDefinitionSyncInstance>(def: T): WasmInstance<T>;
-export function EmWasm<T extends TDefinitionAsyncInstance>(def: T): Promise<WasmInstance<T>>;
-export function EmWasm<T extends TDefinition>(def: T): any {
-  if ((def as any).data) {
-    // normal compiled runtime call: actual wasm initialization
+export function EmWasm(def: IWasmDefinitionSyncBytes): Uint8Array;
+export function EmWasm(def: IWasmDefinitionAsyncBytes): Promise<Uint8Array>;
+export function EmWasm(def: IWasmDefinitionSyncModule): WebAssembly.Module;
+export function EmWasm(def: IWasmDefinitionAsyncModule): Promise<WebAssembly.Module>;
+export function EmWasm<T extends IWasmDefinitionSyncInstance>(def: T): WasmInstance<T>;
+export function EmWasm<T extends IWasmDefinitionAsyncInstance>(def: T): Promise<WasmInstance<T>>;
+export function EmWasm<T extends IWasmDefinition>(def: T): any {
+  if ((def as any).d) {
+    // default compiled call: wasm loading during runtime
+    // for the sake of small bundling size (<900 bytes) the code is somewhat degenerated
+    // see cli.ts for the meaning of the {t, s, d, e} object properties
+    const {t, s, d, e} = def as any;
     const W = WebAssembly;
-    const d = def as any;
-    if (d.type === OutputType.BYTES) {
-      if (d.sync) return _dec(d.data);
-      return Promise.resolve(_dec(d.data));
+    if (t === OutputType.BYTES) {
+      if (s) return _dec(d);
+      return Promise.resolve(_dec(d));
     }
-    if (d.type === OutputType.MODULE) {
-      if (d.sync) return new W.Module(_dec(d.data));
-      if (typeof W.compileStreaming === 'undefined') return W.compile(_dec(d.data));
-      return W.compileStreaming(
-        new Response(_dec(d.data), {status: 200, headers: {'Content-Type': 'application/wasm'}})
-      );
+    if (t === OutputType.MODULE) {
+      if (s) return new W.Module(_dec(d));
+      if (typeof W.compileStreaming === 'undefined') return W.compile(_dec(d));
+      return W.compileStreaming(_res(d));
     }
-    if (d.sync)
-      return addDefines(
-        new W.Instance(new W.Module(_dec(d.data)), d.env ? {env: d.env} : undefined) as WasmInstance<T>,
-        d.defines
-      );
+    if (s)
+      return new W.Instance(new W.Module(_dec(d)), _env(e)) as WasmInstance<T>;
     if (typeof W.instantiateStreaming === 'undefined')
-      return W.instantiate(_dec(d.data), d.env ? {env: d.env} : undefined)
-        .then(inst => addDefines(inst.instance as WasmInstance<T>, d.defines));
-    return W.instantiateStreaming(
-      new Response(_dec(d.data), {status: 200, headers: {'Content-Type': 'application/wasm'}}),
-      d.env ? {env: d.env} : undefined
-    ).then(inst => addDefines(inst.instance as WasmInstance<T>, d.defines));
+      return W.instantiate(_dec(d), _env(e))
+        .then(inst => inst.instance as WasmInstance<T>);
+    return W.instantiateStreaming(_res(d), _env(e))
+      .then(inst => inst.instance as WasmInstance<T>);
   }
-  // invalid precomiled run throws error
-  if (typeof _emwasmCtx === 'undefined') throw new Error('must call emwasm');
-  _emwasmCtx.addUnit(def);
+  // invalid call: uncompiled normal run throws
+  if (typeof _emwasmCtx === 'undefined') throw new Error('must run "emwasm"');
+  _emwasmCtx.add(def);
 }

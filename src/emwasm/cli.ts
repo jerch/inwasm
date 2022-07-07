@@ -4,13 +4,13 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { execSync } from 'child_process';
-import { TDefinition, _IEmWasmCtx } from './definitions';
+import { IWasmDefinition, _IEmWasmCtx } from './definitions';
 
 import * as chokidar from 'chokidar';
 
 
 interface IWasmSourceDefinition {
-  definition: TDefinition;
+  definition: IWasmDefinition;
   stack: string;
 }
 
@@ -29,7 +29,7 @@ let UNITS: IWasmSourceDefinition[] = [];
 
 
 (global as any)._emwasmCtx = {
-  addUnit: (definition) => {
+  add: (definition) => {
     if (!definition.name) return;
     UNITS.push({definition, stack: ''});
     // stop further loading
@@ -146,7 +146,7 @@ function identifyBlock(wdef: IWasmSourceDefinition, blocks: IWasmBlock[], filena
 }
 
 
-function compileEmscripten(definition: TDefinition): Buffer {
+function compileEmscripten(definition: IWasmDefinition): Buffer {
   // FIXME: needs major overhaul:
   //  - eg. do compilation in local folder to preserve wasm files
   //  - name wasm files from unit name
@@ -192,20 +192,11 @@ function compileEmscripten(definition: TDefinition): Buffer {
 
 
 function createCompiledBlock(wasm: Buffer, wdef: IWasmSourceDefinition): string {
-  const defines = [];
-  for (const [k, v] of Object.entries(wdef.definition.compile?.defines || {})) {
-    if (typeof v === 'number') {
-      defines.push(`${k}: ${v}`);
-    } else if (typeof v === 'string') {
-      defines.push(`${k}: '${v}'`);
-    }
-  }
   const parts: string[] = [];
-  if (defines.length) parts.push(`defines:{${defines.join(',')}}`);
-  if (wdef.definition.imports) parts.push('env:' + wdef.definition.imports);
-  parts.push(`sync:${wdef.definition.mode || 0}`);
-  parts.push(`type:${wdef.definition.type || 0}`);
-  parts.push(`data:'${wasm.toString('base64')}'`);
+  parts.push(`e:${wdef.definition.imports || 0}`);
+  parts.push(`s:${wdef.definition.mode || 0}`);
+  parts.push(`t:${wdef.definition.type || 0}`);
+  parts.push(`d:'${wasm.toString('base64')}'`);
   return `{${parts.join(',')}}`;
 }
 
@@ -226,8 +217,22 @@ function loadModule(filename: string) {
   }
 }
 
+// TODO...
+async function loadModuleES6(filename: string) {
+  const modulePath = path.resolve(filename);
+  const randStr = Math.random().toString(36).replace(/[^a-z]+/g, '').slice(0, 5);
+  await import(modulePath + `?bogus=${randStr}`).catch(e => {
+    if (!(e instanceof EmWasmReadExit)) {
+      console.log('error during require:', e);
+      return;
+    }
+    // attach stack for block identification
+    UNITS[0].stack = e.stack || '';
+  })
+}
 
-function processFile(filename: string) {
+
+async function processFile(filename: string) {
   // parse file for wasm blocks
   let content = fs.readFileSync(filename, {encoding: 'utf-8'});
   let blocks = parseFileContent(content, filename);
@@ -238,7 +243,9 @@ function processFile(filename: string) {
   while (blocks.length) {
     // should only load one description a time
     UNITS.length = 0;
+    // TODO: ES6 module loading support
     loadModule(filename);
+    //await loadModuleES6(filename);
     if (!UNITS.length) {
       console.warn('Warning: ##EMWASM## block without call to EmWasm** found, skipping');
       break;
@@ -285,7 +292,7 @@ function runWatcher(args: string[]) {
 }
 
 
-function main() {
+async function main() {
   const args = process.argv.slice(2);
   if (args.indexOf('-w') !== -1) {
     return runWatcher(args);
@@ -294,7 +301,7 @@ function main() {
     return console.log(`usage: emwasm [-w] files|glob`);
   }
   for (const filename of args) {
-    processFile(filename);
+    await processFile(filename);
   }
 }
 main();

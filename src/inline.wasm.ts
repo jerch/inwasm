@@ -1,5 +1,8 @@
 import { EmWasm, OutputMode, OutputType } from './emwasm/definitions';
 
+const SETTINGS = {
+  chunkSize: 4096
+}
 
 const unit = EmWasm( /* ##EMWASM## */ {
   name: 'unit',
@@ -7,7 +10,7 @@ const unit = EmWasm( /* ##EMWASM## */ {
   mode: OutputMode.SYNC,
   srctype: 'C',
   compile: {
-    defines: {CHUNK_SIZE: 4096}
+    defines: { CHUNK_SIZE: SETTINGS.chunkSize }
   },
   exports: {
     chunk_addr: () => 0,
@@ -35,8 +38,8 @@ const unit = EmWasm( /* ##EMWASM## */ {
 } /* ##\EMWASM## */ );
 
 
-const CHUNK = new Uint8Array(unit.exports.memory.buffer, unit.exports.chunk_addr(), unit.defines.CHUNK_SIZE);
-const TARGET = new Uint8Array(unit.exports.memory.buffer, unit.exports.target_addr(), unit.defines.CHUNK_SIZE / 2);
+const CHUNK = new Uint8Array(unit.exports.memory.buffer, unit.exports.chunk_addr(), SETTINGS.chunkSize);
+const TARGET = new Uint8Array(unit.exports.memory.buffer, unit.exports.target_addr(), SETTINGS.chunkSize / 2);
 
 export function convert16BitTo8BitData(data: Uint16Array, target?: Uint8Array): Uint8Array {
   const view = new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
@@ -45,7 +48,7 @@ export function convert16BitTo8BitData(data: Uint16Array, target?: Uint8Array): 
   let p = 0;
   let offset = 0;
   while (p < end) {
-    const length = Math.min(end - p, unit.defines.CHUNK_SIZE);
+    const length = Math.min(end - p, SETTINGS.chunkSize);
     CHUNK.set(view.subarray(p, p += length));
     const rlen = unit.exports.convert(length);
     result.set(TARGET.subarray(0, rlen), offset);

@@ -3,6 +3,9 @@
   "version": "0.0.1",
   "description": "wasm/emscripten with typescript and npm bundling test",
   "main": "./lib/index.js",
+  "bin": {
+    "emwasm": "./lib/emwasm/cli.js"
+  },
   "scripts": {
     "test": "mocha lib/*.test.js",
     "tsc": "tsc",
