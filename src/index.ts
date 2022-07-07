@@ -128,4 +128,4 @@ export function convert16BitTo8BitData(data: Uint16Array, target?: Uint8Array): 
 }
 
 
-export { second } from './inline';
+export {second} from './inline.wasm';

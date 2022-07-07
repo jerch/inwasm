@@ -4,28 +4,34 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { execSync } from 'child_process';
-import { TDefinition, TGenerate, _IEmWasmCtx } from './definitions';
+import { TDefinition, _IEmWasmCtx } from './definitions';
+
+import * as chokidar from 'chokidar';
 
 
 interface IWasmSourceDefinition {
   definition: TDefinition;
-  generate: TGenerate;
   stack: string;
 }
+
 
 interface IWasmBlock {
   start: number;
   end: number;
 }
 
+
 class EmWasmReadExit extends Error {}
 
-let units: IWasmSourceDefinition[] = [];
+
+// global var to hold loaded description
+let UNITS: IWasmSourceDefinition[] = [];
+
 
 (global as any)._emwasmCtx = {
-  addUnit: (definition, generate) => {
+  addUnit: (definition) => {
     if (!definition.name) return;
-    units.push({definition, generate, stack: ''});
+    UNITS.push({definition, stack: ''});
     // stop further loading
     throw new EmWasmReadExit('exit');
   }
@@ -131,18 +137,8 @@ function identifyBlock(wdef: IWasmSourceDefinition, blocks: IWasmBlock[], filena
           distance = blocks[k].start - stackPos;
         }
       }
-      if (blockId === -1) throw new Error('error finding wasm block close to stack position');
-
-      // sanity check: generate should match function name infront of wasm block
-      const instIdx = content.lastIndexOf('EmWasmInstance', blocks[blockId].start);
-      const modIdx = content.lastIndexOf('EmWasmModule', blocks[blockId].start);
-      const bytesIdx = content.lastIndexOf('EmWasmBytes', blocks[blockId].start);
-      if (instIdx === -1 && modIdx === -1 && bytesIdx === -1) throw new Error('cannot dermine generate type');
-      const highestIdx = Math.max(instIdx, modIdx, bytesIdx);
-      const generate = highestIdx === instIdx ? 'instance'
-        : highestIdx === modIdx ? 'module'
-        : 'bytes';
-      if (generate !== wdef.generate) throw new Error('mismatch in generate types');
+      // either no block follows stack position or distance is inacceptable
+      if (blockId === -1 || distance > 20) throw new Error('error finding wasm block close to stack position');
       return blockId;
     }
   }
@@ -207,14 +203,14 @@ function createCompiledBlock(wasm: Buffer, wdef: IWasmSourceDefinition): string 
   const parts: string[] = [];
   if (defines.length) parts.push(`defines:{${defines.join(',')}}`);
   if (wdef.definition.imports) parts.push('env:' + wdef.definition.imports);
-  parts.push(`sync:${wdef.definition.mode === 'sync' ? 1 : 0}`);
+  parts.push(`sync:${wdef.definition.mode || 0}`);
+  parts.push(`type:${wdef.definition.type || 0}`);
   parts.push(`data:'${wasm.toString('base64')}'`);
   return `{${parts.join(',')}}`;
 }
 
 
 function loadModule(filename: string) {
-  units.length = 0;
   try {
     // FIXME: needs ES6 patch
     const modulePath = path.resolve(filename);
@@ -225,41 +221,80 @@ function loadModule(filename: string) {
       console.log('error during require:', e);
       return;
     }
-    if (units.length !== 1) throw new Error("did not find a single description");
-    units[0].stack = e.stack || '';
+    // attach stack for block identification
+    UNITS[0].stack = e.stack || '';
   }
+}
+
+
+function processFile(filename: string) {
+  // parse file for wasm blocks
+  let content = fs.readFileSync(filename, {encoding: 'utf-8'});
+  let blocks = parseFileContent(content, filename);
+  if (!blocks.length) return;
+  console.log(`${blocks.length} wasm code blocks found in ${filename}`);
+
+  // iterate file blocks until done
+  while (blocks.length) {
+    // should only load one description a time
+    UNITS.length = 0;
+    loadModule(filename);
+    if (!UNITS.length) {
+      console.warn('Warning: ##EMWASM## block without call to EmWasm** found, skipping');
+      break;
+    }
+    const wdef = UNITS[0];
+    const blockId = identifyBlock(wdef, blocks, filename, content);
+    const block = blocks[blockId];
+    console.log(`\n'${wdef.definition.name}' at ${filename}, offset [${block.start},${block.end}]:\n`);
+
+    // compile & create new block
+    const wasm = compileEmscripten(wdef.definition);
+    const blockReplace = createCompiledBlock(wasm, wdef);
+
+    // write output
+    const final: string[] = [content.slice(0, block.start), blockReplace, content.slice(block.end)];
+    fs.writeFileSync(filename, final.join(''));
+
+    // re-parse
+    content = fs.readFileSync(filename, {encoding: 'utf-8'});
+    blocks = parseFileContent(content, filename);
+  }
+}
+
+
+// default glob pattern
+const DEFAULT_GLOB = ['./**/*.wasm.js']
+
+
+function runWatcher(args: string[]) {
+  args.splice(args.indexOf('-w'), 1);
+  const pattern = args.length ? args : DEFAULT_GLOB;
+  console.log(`Starting watch mode with pattern ${pattern.join(' ')}`);
+  chokidar.watch(pattern).on('all', (event, filename) => {
+    if (['add', 'change'].includes(event)) {
+      try {
+        processFile(filename);
+      } catch (e) {
+        console.error(`Error while processing ${filename}:`);
+        console.log(e);
+      }
+      console.log('\n\n');
+    }
+  });
 }
 
 
 function main() {
-  for (const filename of process.argv.slice(2)) {
-    let content = fs.readFileSync(filename, {encoding: 'utf-8'});
-    let blocks = parseFileContent(content, filename);
-    if (!blocks.length) continue;
-    console.log(`${blocks.length} wasm code blocks found in ${filename}`);
-
-    // should only load one description a time
-    while (blocks.length) {
-      loadModule(filename);
-      const wdef = units[0];
-      if (!wdef) {
-        console.warn('Warning: ##EMWASM## block without call to EmWasm** found, skipping');
-        break;
-      }
-      const blockId = identifyBlock(wdef, blocks, filename, content);
-      const block = blocks[blockId];
-      console.log(`\n'${wdef.definition.name}' at ${filename}, offset [${block.start},${block.end}]:\n`);
-
-      // compile & create new block
-      const wasm = compileEmscripten(wdef.definition);
-      const blockReplace = createCompiledBlock(wasm, wdef);
-
-      const final: string[] = [content.slice(0, block.start), blockReplace, content.slice(block.end)];
-      fs.writeFileSync(filename, final.join(''));
-      content = fs.readFileSync(filename, {encoding: 'utf-8'});
-      blocks = parseFileContent(content, filename);
-    }
+  const args = process.argv.slice(2);
+  if (args.indexOf('-w') !== -1) {
+    return runWatcher(args);
+  }
+  if (!args.length) {
+    return console.log(`usage: emwasm [-w] files|glob`);
+  }
+  for (const filename of args) {
+    processFile(filename);
   }
 }
-
 main();

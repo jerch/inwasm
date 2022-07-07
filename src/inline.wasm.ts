@@ -1,9 +1,10 @@
-import { EmWasmInstance } from './emwasm/definitions';
+import { EmWasm, OutputMode, OutputType } from './emwasm/definitions';
 
 
-const unit = EmWasmInstance( /* ##EMWASM## */ {
+const unit = EmWasm( /* ##EMWASM## */ {
   name: 'unit',
-  mode: 'sync',
+  type: OutputType.INSTANCE,
+  mode: OutputMode.SYNC,
   srctype: 'C',
   compile: {
     defines: {CHUNK_SIZE: 4096}
@@ -65,11 +66,12 @@ console.log(
 const env = {jsadd: (a: number, b: number) => a + b}
 
 
-export const second = EmWasmInstance(
+export const second = EmWasm(
   // ##EMWASM##
   {
     name: 'second',
-    mode: 'async',
+    type: OutputType.BYTES,
+    mode: OutputMode.SYNC,
     srctype: 'C',
     imports: 'env',
     exports: {
@@ -87,11 +89,3 @@ export const second = EmWasmInstance(
   }
   // ##\EMWASM##
 );
-
-async function bla() {
-  const s = await second;
-  console.log(s);
-  console.log((await second).exports.add(11, 22));
-}
-bla();
-
