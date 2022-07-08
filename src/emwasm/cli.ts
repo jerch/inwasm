@@ -194,7 +194,7 @@ function compileEmscripten(definition: IWasmDefinition): Buffer {
     const funcs = `-s EXPORTED_FUNCTIONS='[${_funcs}]'`;
     const call = `${sdk} && emcc ${opt} ${defines} ${funcs} ${switches} --no-entry ${src} -o ${target}`;
     console.log(call);
-    execSync(call, {shell: '/bin/bash'});
+    execSync(call, {shell: '/bin/bash', stdio: 'inherit'});
 
     //// clang tests:
     //console.log(definition.exports);
