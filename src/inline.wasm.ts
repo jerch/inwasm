@@ -84,6 +84,9 @@ export const second = EmWasm(
     // forward decl w'o real impl (marked for import by emscripten)
     int jsadd(int a, int b);
 
+    // clang style
+    //__attribute__((import_module("env"), import_name("jsadd"))) int jsadd(int a, int b);
+
     // some silly function
     int add(int a, int b) {
       return jsadd(a, b);

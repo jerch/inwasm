@@ -47,7 +47,7 @@ export interface IWasmDefinition {
   // whether to treat `code` below as C or C++ source.
   srctype: 'C' | 'C++',
   // Exported wasm functions, for proper TS typing simply stub them.
-  exports: {[key: string]: Function},
+  exports: {[key: string]: Function | WebAssembly.Global},  // FIXME: is general symbol export possible with EM?
   // Name of the env import object (must be visible at runtime). Only used for instance.
   imports?: string,
   // Inline source code (C or C++).

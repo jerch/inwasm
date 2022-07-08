@@ -145,6 +145,25 @@ function identifyBlock(wdef: IWasmSourceDefinition, blocks: IWasmBlock[], filena
   throw new Error('error finding matching wasm block');
 }
 
+/**
+ * TODO: compileClang
+ *
+ * https://lld.llvm.org/WebAssembly.html
+ * https://clang.llvm.org/docs/AttributeReference.html
+ * https://github.com/schellingb/ClangWasm
+ * https://surma.dev/things/c-to-webassembly/
+ * https://github.com/jedisct1/libclang_rt.builtins-wasm32.a
+ * https://depth-first.com/articles/2019/10/16/compiling-c-to-webassembly-and-running-it-without-emscripten/
+ *
+ * __attribute__((import_module("env"), import_name("externalFunction"))) void externalFunction(void);
+ * __attribute__((export_name(<name>)))
+ * __attribute__((import_module(<module_name>)))
+ * __attribute__((import_name(<name>)))
+ */
+
+/**
+ * TODO: support for AS - assemblyscript?
+ */
 
 function compileEmscripten(definition: IWasmDefinition): Buffer {
   // FIXME: needs major overhaul:
@@ -176,7 +195,22 @@ function compileEmscripten(definition: IWasmDefinition): Buffer {
     const call = `${sdk} && emcc ${opt} ${defines} ${funcs} ${switches} --no-entry ${src} -o ${target}`;
     console.log(call);
     execSync(call, {shell: '/bin/bash'});
+
+    //// clang tests:
+    //console.log(definition.exports);
+    //const ff = Object.entries(definition.exports)
+    //  .filter(el => typeof el[1] === 'function' || el[1] instanceof WebAssembly.Global)
+    //  .map(el => `--export=${el[0]}`)
+    //  .join(',');
+    //console.log(ff);
+    ////const symex = definition.name === 'unit' ? '-Wl,--export=CHUNK' : '';
+    //const call = `${wd}/../../playground/emsdk/upstream/bin/clang --target=wasm32 --no-standard-libraries -Wl,${ff} -Wl,--no-entry -Wl,--lto-O3 ${opt} -flto ${defines} -o ${target} ${src}`;
+    //console.log(call);
+    //execSync(call, {shell: '/bin/bash'});
+
+    // FIXME: unset result in case of error
     result = fs.readFileSync(target);
+    if (!WebAssembly.validate(result)) throw new Error('wasm file is erroneous');
   } catch (e) {
     console.log(e);
   }
