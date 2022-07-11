@@ -26,7 +26,7 @@ interface IStackFrameInfo {
 }
 
 
-class EmWasmReadExit extends Error {}
+class EmWasmReadExit extends Error { }
 
 
 // global var to hold loaded description
@@ -37,9 +37,13 @@ let UNITS: IWasmSourceDefinition[] = [];
 (global as any)._emwasmCtx = {
   add: (definition) => {
     if (!definition.name) return;
-    UNITS.push({definition, stack: ''});
-    // stop further loading
-    throw new EmWasmReadExit('exit');
+    try {
+      throw new EmWasmReadExit('exit');
+    } catch (e) {
+      if (e instanceof EmWasmReadExit)
+        UNITS.push({definition, stack: e.stack || ''});
+      throw e;
+    }
   }
 } as _IEmWasmCtx;
 
@@ -53,9 +57,15 @@ function parseCallStack(callstack: string): IStackFrameInfo[] {
   const entries: IStackFrameInfo[] = [];
   for (let i = 1; i < stack.length; ++i) {
     const line = stack[i];
+    // default case: '   at callXY (file.js:123:45)
     const m = line.match(/^\s*at (.*?) [(](.*?):(\d+):(\d+)[)]$/);
-    if (!m) throw new Error('error parsing stack positions');
-    entries.push({at: m[1], unit: m[2], line: parseInt(m[3]), column: parseInt(m[4])});
+    // rare case w'o at: '   at file.js:123:45'
+    const n = line.match(/^\s*at (.*?):(\d+):(\d+)$/);
+    if (!m && !n) throw new Error('error parsing stack positions');
+    if (m)
+      entries.push({ at: m[1], unit: m[2], line: parseInt(m[3]), column: parseInt(m[4]) });
+    else if (n)
+      entries.push({ at: '', unit: n[1], line: parseInt(n[2]), column: parseInt(n[3]) });
   }
   return entries;
 }
@@ -84,7 +94,7 @@ function getStackFrame(callstack: IStackFrameInfo[], filename: string): IStackFr
  * - check for single node argument of type ObjectExpression, otherwise throw
  */
 function identifyDefinitionBlock(stackFrame: IStackFrameInfo, content: string): acorn.Node {
-  const ast = acorn.parse(content, {locations: true, ecmaVersion: 'latest'});
+  const ast = acorn.parse(content, { locations: true, ecmaVersion: 'latest' });
   const calls: acorn.Node[] = [];
   walk.simple(ast, {
     CallExpression(node) {
@@ -161,7 +171,7 @@ function compileEmscripten(definition: IWasmDefinition): Buffer {
     process.chdir(tmpDir);
     const sdk = `source ${wd}/emsdk/emsdk_env.sh > /dev/null 2>&1`;
     const src = 'src.c';
-    const target = 'src.wasm';
+    const target = `${definition.name}.wasm`;
     const opt = `-O3`;
     fs.writeFileSync(src, definition.code);
     const defines = Object.entries(definition.compile?.defines || {})
@@ -170,11 +180,15 @@ function compileEmscripten(definition: IWasmDefinition): Buffer {
       .filter(el => typeof el[1] === 'function')
       .map(el => `"_${el[0]}"`)
       .join(',');
-    const switches = `-s ERROR_ON_UNDEFINED_SYMBOLS=0 -s WARN_ON_UNDEFINED_SYMBOLS=0`;
+    let add_switches = '';
+    if (definition.compile && definition.compile.switches) {
+      add_switches = definition.compile.switches.join(' ');
+    }
+    const switches = `-s ERROR_ON_UNDEFINED_SYMBOLS=0 -s WARN_ON_UNDEFINED_SYMBOLS=0 ` + add_switches;
     const funcs = `-s EXPORTED_FUNCTIONS='[${_funcs}]'`;
     const call = `${sdk} && emcc ${opt} ${defines} ${funcs} ${switches} --no-entry ${src} -o ${target}`;
     console.log(call);
-    execSync(call, {shell: '/bin/bash', stdio: 'inherit'});
+    execSync(call, { shell: '/bin/bash', stdio: 'inherit' });
 
     //// clang tests:
     //console.log(definition.exports);
@@ -190,14 +204,13 @@ function compileEmscripten(definition: IWasmDefinition): Buffer {
 
     // FIXME: unset result in case of error
     result = fs.readFileSync(target);
-    if (!WebAssembly.validate(result)) throw new Error('wasm file is erroneous');
   } catch (e) {
     console.log(e);
   }
   finally {
     try {
-      if (tmpDir) fs.rmSync(tmpDir, {recursive: true});
-    } catch (e) {}
+      if (tmpDir) fs.rmSync(tmpDir, { recursive: true });
+    } catch (e) { }
   }
   process.chdir(wd);
   if (!result) throw new Error('compile error');
@@ -229,11 +242,9 @@ function loadModule(filename: string) {
     require(modulePath);
   } catch (e) {
     if (!(e instanceof EmWasmReadExit)) {
-      console.log('error during require:', e);
+      console.log('error during module require:', e);
       return;
     }
-    // attach stack for block identification
-    UNITS[0].stack = e.stack || '';
   }
 }
 
@@ -247,11 +258,9 @@ async function loadModuleES6(filename: string) {
   const randStr = Math.random().toString(36).replace(/[^a-z]+/g, '').slice(0, 5);
   await import(modulePath + `?bogus=${randStr}`).catch(e => {
     if (!(e instanceof EmWasmReadExit)) {
-      console.log('error during require:', e);
+      console.log('error during module import:', e);
       return;
     }
-    // attach stack for block identification
-    UNITS[0].stack = e.stack || '';
   })
 }
 
@@ -260,14 +269,14 @@ async function loadModuleES6(filename: string) {
  * Process a single source file.
  */
 async function processFile(filename: string) {
-  let lastStackFrame: IStackFrameInfo = {at: '', unit: '', line: -1, column: -1};
+  let lastStackFrame: IStackFrameInfo = { at: '', unit: '', line: -1, column: -1 };
   // read file content, exit early if no EmWasm was found at all
-  let content = fs.readFileSync(filename, {encoding: 'utf-8'});
+  let content = fs.readFileSync(filename, { encoding: 'utf-8' });
   if (content.indexOf('EmWasm') === -1) return;
 
   // loop until all EmWasmReadExit errors are resolved
   while (true) {
-    // load module (one description a time)
+    // load module - may fill UNITS with next discovered definitions
     UNITS.length = 0;
     // TODO: ES6 module loading support
     loadModule(filename);
@@ -276,27 +285,35 @@ async function processFile(filename: string) {
     // done if the module does not throw EmWasmReadExit anymore
     if (!UNITS.length) break;
 
-    // get stack position, error if we dont make any progress
-    const wdef = UNITS[0];
-    const stackFrame = getStackFrame(parseCallStack(wdef.stack), filename);
-    if (lastStackFrame.line === stackFrame.line && lastStackFrame.column === stackFrame.column) {
-      throw new Error(`unable to parse/compile EmWasm call at ${filename}:${stackFrame.line}:${stackFrame.column}`);
+    const final: string[] = [];
+    let lastEnd = 0;
+    for (const wdef of UNITS) {
+      // get stack position, error if we dont make any progress
+      const stackFrame = getStackFrame(parseCallStack(wdef.stack), filename);
+      if (lastStackFrame.line === stackFrame.line && lastStackFrame.column === stackFrame.column) {
+        throw new Error(`unable to parse/compile EmWasm call at ${filename}:${stackFrame.line}:${stackFrame.column}`);
+      }
+      lastStackFrame = stackFrame;
+
+      // match stack position to source pos
+      const block = identifyDefinitionBlock(stackFrame, content);
+
+      // compile & create new block
+      const wasm = compileEmscripten(wdef.definition);
+      const blockReplace = createRuntimeDefinition(wasm, wdef);
+
+      // push parts with replacement
+      final.push(content.slice(lastEnd, block.start));
+      final.push(blockReplace);
+      lastEnd = block.end;
     }
-    lastStackFrame = stackFrame;
-
-    // match stack position to source pos
-    const block = identifyDefinitionBlock(stackFrame, content);
-
-    // compile & create new block
-    const wasm = compileEmscripten(wdef.definition);
-    const blockReplace = createRuntimeDefinition(wasm, wdef);
+    final.push(content.slice(lastEnd));
 
     // write output
-    const final: string[] = [content.slice(0, block.start), blockReplace, content.slice(block.end)];
     fs.writeFileSync(filename, final.join(''));
 
     // re-read content
-    content = fs.readFileSync(filename, {encoding: 'utf-8'});
+    content = fs.readFileSync(filename, { encoding: 'utf-8' });
   }
 }
 

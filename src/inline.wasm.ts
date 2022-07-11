@@ -1,45 +1,94 @@
 import { EmWasm, OutputMode, OutputType } from './emwasm/definitions';
 
 const SETTINGS = {
-  chunkSize: 4096
-}
+  chunkSize: 16384
+} as const;
 
-const unit = EmWasm({
-  name: 'unit',
-  type: OutputType.INSTANCE,
-  mode: OutputMode.SYNC,
-  srctype: 'C',
-  compile: {
-    defines: { CHUNK_SIZE: SETTINGS.chunkSize }
-  },
-  exports: {
-    chunk_addr: () => 0,
-    target_addr: () => 0,
-    convert: (length: number) => 0
-  },
-  code: `
+
+const convert = (() => {
+  try {
+    return EmWasm({
+      name: 'convert-simd',
+      type: OutputType.INSTANCE,
+      mode: OutputMode.SYNC,
+      srctype: 'C',
+      compile: {
+        defines: { CHUNK_SIZE: SETTINGS.chunkSize },
+        switches: ['-msimd128', '-msse', '-msse2', '-mssse3', '-msse4.1']
+      },
+      exports: {
+        chunk_addr: () => 0,
+        target_addr: () => 0,
+        convert: (length: number) => 0
+      },
+      code: `
   static unsigned char CHUNK[CHUNK_SIZE] __attribute__((aligned(16)));
   static unsigned char TARGET[CHUNK_SIZE/2] __attribute__((aligned(16)));
-  
+
   void* chunk_addr() { return &CHUNK[0]; }
   void* target_addr() { return &TARGET[0]; }
   int convert(int length);
-  
+
+  #include <immintrin.h>
   int convert(int length) {
-    unsigned char *src = CHUNK + 1;
+    unsigned char *src = CHUNK;
     unsigned char *dst = TARGET;
-    int len = length / 2;
-    for (; len--; src += 2) {
-      *dst++ = *src;
+    int len = length / 32;
+    while(len--) {
+      // 2x shift variant (faster than shuffle on wasm simd)
+      __m128i v0 = _mm_loadu_si128((__m128i*) src);
+      __m128i v1 = _mm_loadu_si128((__m128i*) (src + 16));
+      v0 = _mm_srli_epi16(v0, 8);
+      v1 = _mm_srli_epi16(v1, 8);
+      __m128i pack = _mm_packus_epi16(v0, v1);
+      _mm_storeu_si128((__m128i*) dst, pack);
+      dst += 16;
+      src += 32;
     }
+    // FIXME: implement tail handling
     return dst - TARGET;
   }
   `
-});
+    });
+  } catch (e) {
+    return EmWasm({
+      name: 'convert',
+      type: OutputType.INSTANCE,
+      mode: OutputMode.SYNC,
+      srctype: 'C',
+      compile: {
+        defines: { CHUNK_SIZE: SETTINGS.chunkSize }
+      },
+      exports: {
+        chunk_addr: () => 0,
+        target_addr: () => 0,
+        convert: (length: number) => 0
+      },
+      code: `
+    static unsigned char CHUNK[CHUNK_SIZE] __attribute__((aligned(16)));
+    static unsigned char TARGET[CHUNK_SIZE/2] __attribute__((aligned(16)));
+
+    void* chunk_addr() { return &CHUNK[0]; }
+    void* target_addr() { return &TARGET[0]; }
+    int convert(int length);
+
+    int convert(int length) {
+      unsigned char *src = CHUNK + 1;
+      unsigned char *dst = TARGET;
+      int len = length / 2;
+      for (; len--; src += 2) {
+        *dst++ = *src;
+      }
+      return dst - TARGET;
+    }
+    `
+    })
+  }
+})();
 
 
-const CHUNK = new Uint8Array(unit.exports.memory.buffer, unit.exports.chunk_addr(), SETTINGS.chunkSize);
-const TARGET = new Uint8Array(unit.exports.memory.buffer, unit.exports.target_addr(), SETTINGS.chunkSize / 2);
+const CHUNK = new Uint8Array(convert.exports.memory.buffer, convert.exports.chunk_addr(), SETTINGS.chunkSize);
+const TARGET = new Uint8Array(convert.exports.memory.buffer, convert.exports.target_addr(), SETTINGS.chunkSize / 2);
 
 export function convert16BitTo8BitData(data: Uint16Array, target?: Uint8Array): Uint8Array {
   const view = new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
@@ -50,7 +99,7 @@ export function convert16BitTo8BitData(data: Uint16Array, target?: Uint8Array): 
   while (p < end) {
     const length = Math.min(end - p, SETTINGS.chunkSize);
     CHUNK.set(view.subarray(p, p += length));
-    const rlen = unit.exports.convert(length);
+    const rlen = convert.exports.convert(length);
     result.set(TARGET.subarray(0, rlen), offset);
     offset += rlen;
   }
@@ -66,19 +115,19 @@ console.log(
 
 
 // with imported functions
-const env = {jsadd: (a: number, b: number) => a + b}
+const env = { jsadd: (a: number, b: number) => a + b }
 
 
 export const second = EmWasm({
-    name: 'second',
-    type: OutputType.BYTES,
-    mode: OutputMode.SYNC,
-    srctype: 'C',
-    imports: 'env',
-    exports: {
-      add: (a: number, b: number) => 0
-    },
-    code: `
+  name: 'second',
+  type: OutputType.BYTES,
+  mode: OutputMode.SYNC,
+  srctype: 'C',
+  imports: 'env',
+  exports: {
+    add: (a: number, b: number) => 0
+  },
+  code: `
     // forward decl w'o real impl (marked for import by emscripten)
     int jsadd(int a, int b);
 
