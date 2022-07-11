@@ -8,6 +8,9 @@ import { IWasmDefinition, _IEmWasmCtx } from './definitions';
 
 import * as chokidar from 'chokidar';
 
+import * as acorn from 'acorn';
+import * as walk from 'acorn-walk';
+
 
 interface IWasmSourceDefinition {
   definition: IWasmDefinition;
@@ -15,9 +18,11 @@ interface IWasmSourceDefinition {
 }
 
 
-interface IWasmBlock {
-  start: number;
-  end: number;
+interface IStackFrameInfo {
+  at: string;
+  unit: string;
+  line: number;
+  column: number;
 }
 
 
@@ -28,6 +33,7 @@ class EmWasmReadExit extends Error {}
 let UNITS: IWasmSourceDefinition[] = [];
 
 
+// inject global compile ctx object
 (global as any)._emwasmCtx = {
   add: (definition) => {
     if (!definition.name) return;
@@ -38,112 +44,82 @@ let UNITS: IWasmSourceDefinition[] = [];
 } as _IEmWasmCtx;
 
 
-function parseFileContent(content: string, filename: string): IWasmBlock[] {
-  const starts: number[] = [];
-  const ends: number[] = [];
-  let idx = -1;
-  while (true) {
-    idx = content.indexOf('##EMWASM##', idx+1);
-    if (idx === -1) break;
-    starts.push(idx);
-  }
-  idx = -1;
-  while (true) {
-    idx = content.indexOf('##\\EMWASM##', idx+1);
-    if (idx === -1) break;
-    ends.push(idx);
-  }
-  // check for unmatched/nested
-  if (starts.length !== ends.length) throw new Error(`in '${filename}' - unmatched ##EMWASM## tokens`);
-  const values: number[] = [];
-  for (let i = 0; i < starts.length; ++i) {
-    values.push(starts[i]);
-    values.push(ends[i]);
-  }
-  for (let i = 0; i < values.length - 1; ++i) {
-    if (values[i] > values[i + 1]) {
-      throw new Error(`in '${filename}' - ##EMWASM tokens may not overlap`);
-    }
-  }
-  // find cut borders
-  for (let i = 0; i < starts.length; ++i) {
-    const idxSingle = content.lastIndexOf('//', starts[i]);
-    const idxMulti = content.lastIndexOf('/*', starts[i]);
-    const realStart = Math.max(idxSingle, idxMulti);
-    if (!content.slice(realStart, starts[i]).match(/^\/(\/\s*)|([*]+\s*)$/)) {
-      throw new Error(`in '${filename}' - cannot parse ##EMWASM## token at ${starts[i]}`);
-    }
-    starts[i] = realStart;
-  }
-  for (let i = 0; i < ends.length; ++i) {
-    const idxSingle = content.lastIndexOf('//', ends[i]);
-    const idxMulti = content.lastIndexOf('/*', ends[i]);
-    const realStart = Math.max(idxSingle, idxMulti);
-    if (!content.slice(realStart, ends[i]).match(/^\/(\/\s*)|([*]+\s*)$/)) {
-      throw new Error(`in '${filename}' - cannot parse ##\EMWASM## token at ${ends[i]}`);
-    }
-    let realEnd = -1;
-    if (realStart === idxSingle ) {
-      // single line, search for \n through end of data
-      realEnd = content.indexOf('\n', realStart);
-      if (realEnd === -1) realEnd = content.length;
-      if (!content.slice(ends[i], realEnd).match(/##\\EMWASM##\s*/)) {
-        throw new Error(`in '${filename}' - cannot parse ##\EMWASM## token at ${ends[i]}`);
-      }
-    } else {
-      // multi line
-      realEnd = content.indexOf('*/', realStart);
-      if (realEnd === -1 || !content.slice(ends[i], realEnd).match(/##\\EMWASM##\s*/)) {
-        throw new Error(`in '${filename}' - cannot parse ##\EMWASM## token at ${ends[i]}`);
-      }
-      realEnd += 2;
-    }
-    ends[i] = realEnd;
-  }
-  const blocks: {start: number, end: number}[] = [];
-  for (let i = 0; i < starts.length; ++i) {
-    blocks.push({start: starts[i], end: ends[i]});
-  }
-  return blocks;
-}
-
-
-function identifyBlock(wdef: IWasmSourceDefinition, blocks: IWasmBlock[], filename: string, content: string): number {
-  // walk call stack to find matching wasm block
-  const stack = wdef.stack.split('\n');
+/**
+ * Parse callstack from EmWasmReadExit errors.
+ */
+function parseCallStack(callstack: string): IStackFrameInfo[] {
+  const stack = callstack.split('\n');
   if (!stack.length) throw new Error('cannot work with empty stack');
-  for (let i = 0; i < stack.length; ++i) {
-    const idx = stack[i].indexOf(filename);
-    if (idx !== -1) {
-      const m = stack[i].slice(idx + filename.length).match(/.*?(\d+):(\d+).*?/);
-      if (!m) throw new Error('error parsing stack positions');
-      const lineNum = parseInt(m[1]);
-      const charPos = parseInt(m[2]);
-      if (isNaN(lineNum) || isNaN(charPos)) throw new Error('error parsing stack positions');
+  const entries: IStackFrameInfo[] = [];
+  for (let i = 1; i < stack.length; ++i) {
+    const line = stack[i];
+    const m = line.match(/^\s*at (.*?) [(](.*?):(\d+):(\d+)[)]$/);
+    if (!m) throw new Error('error parsing stack positions');
+    entries.push({at: m[1], unit: m[2], line: parseInt(m[3]), column: parseInt(m[4])});
+  }
+  return entries;
+}
 
-      // find closest block
-      let idxNl = -1;
-      for (let k = 0; k < lineNum - 1; ++k) {
-        idxNl = content.indexOf('\n', idxNl + 1);
-        if (idxNl == -1) throw new Error('error parsing line positions from stack values');
-      }
-      const stackPos = idxNl + charPos;
-      let blockId = -1;
-      let distance = Number.MAX_SAFE_INTEGER;
-      for (let k = 0; k < blocks.length; ++k) {
-        if (blocks[k].start < stackPos) continue;
-        if (blocks[k].start - stackPos < distance) {
-          blockId = k;
-          distance = blocks[k].start - stackPos;
-        }
-      }
-      // either no block follows stack position or distance is inacceptable
-      if (blockId === -1 || distance > 20) throw new Error('error finding wasm block close to stack position');
-      return blockId;
+
+/**
+ * Find first stack frame in `filename` following an `EmWasm` call.
+ * This assumes, that every error location has a distinct `EmWasm` call
+ * and has no further indirection.
+ */
+function getStackFrame(callstack: IStackFrameInfo[], filename: string): IStackFrameInfo {
+  for (let i = 0; i < callstack.length; ++i) {
+    if (callstack[i].unit.indexOf(filename) !== -1) {
+      if (callstack[i - 1] && callstack[i - 1].at === 'EmWasm') return callstack[i];
     }
   }
-  throw new Error('error finding matching wasm block');
+  throw new Error('error finding distinct EmWasm call from callstack');
 }
+
+
+/**
+ * Returns argument node of `EmWasm({...})` call from matching stack frame.
+ *
+ * Search/narrowing happens by these steps:
+ * - find closest single CallExpression node at stack frame position, otherwise throw
+ * - check for single node argument of type ObjectExpression, otherwise throw
+ */
+function identifyDefinitionBlock(stackFrame: IStackFrameInfo, content: string): acorn.Node {
+  const ast = acorn.parse(content, {locations: true, ecmaVersion: 'latest'});
+  const calls: acorn.Node[] = [];
+  walk.simple(ast, {
+    CallExpression(node) {
+      // FIXME: needs descending check for nested CallExpression
+      if (node.loc!.start.line <= stackFrame.line && node.loc!.end.line >= stackFrame.line) {
+        const start = node.loc!.start;
+        const end = node.loc!.end;
+        if (start.line === stackFrame.line && end.line === stackFrame.line) {
+          // cut any before/after on same line
+          if (start.column < stackFrame.column && end.column < stackFrame.column) return;
+          if (start.column > stackFrame.column) return;
+        }
+        calls.push(node);
+      }
+    }
+  });
+  // expected: exactly at least one CallExpression with exactly one argument of type ObjectExpression
+  if (!calls.length) throw new Error('malformed source: no EmWasm CallExpression found');
+  let idx = 0;
+  if (calls.length !== 1) {
+    // find the innermost (highest start), sanity check for lowest end
+    for (let i = 1; i < calls.length; ++i)
+      if (calls[idx].start < calls[i].start) idx = i;
+    if (calls[idx].end > Math.min(...calls.map(el => el.end)))
+      throw new Error('malformed source: could not determine EmWasm CallExpression');
+  }
+  // innermost call is expected to get wasm definition as {...} literal
+  const args = (calls[idx] as any).arguments;
+  if (!args || args.length != 1 || args[0].type !== 'ObjectExpression')
+    throw new Error('malformed source: expected one ObjectExpression argument');
+  // FIXME: should we check for proper definition object content here?
+  // console.log(args[0].properties.map((el: any) => el.key.name));
+  return args[0];
+}
+
 
 /**
  * TODO: compileClang
@@ -162,9 +138,13 @@ function identifyBlock(wdef: IWasmSourceDefinition, blocks: IWasmBlock[], filena
  */
 
 /**
- * TODO: support for AS - assemblyscript?
+ * TODO: support for AS - assemblyscript, zig or rust?
  */
 
+
+/**
+ * Compile with emscripten.
+ */
 function compileEmscripten(definition: IWasmDefinition): Buffer {
   // FIXME: needs major overhaul:
   //  - eg. do compilation in local folder to preserve wasm files
@@ -225,7 +205,10 @@ function compileEmscripten(definition: IWasmDefinition): Buffer {
 }
 
 
-function createCompiledBlock(wasm: Buffer, wdef: IWasmSourceDefinition): string {
+/**
+ * Create minimal runtime definition as source string.
+ */
+function createRuntimeDefinition(wasm: Buffer, wdef: IWasmSourceDefinition): string {
   const parts: string[] = [];
   parts.push(`e:${wdef.definition.imports || 0}`);
   parts.push(`s:${wdef.definition.mode || 0}`);
@@ -235,6 +218,9 @@ function createCompiledBlock(wasm: Buffer, wdef: IWasmSourceDefinition): string 
 }
 
 
+/**
+ * Load module `fielname` as node module.
+ */
 function loadModule(filename: string) {
   try {
     // FIXME: needs ES6 patch
@@ -251,6 +237,10 @@ function loadModule(filename: string) {
   }
 }
 
+
+/**
+ * Load module `filename` as ES6 module.
+ */
 // TODO...
 async function loadModuleES6(filename: string) {
   const modulePath = path.resolve(filename);
@@ -266,40 +256,47 @@ async function loadModuleES6(filename: string) {
 }
 
 
+/**
+ * Process a single source file.
+ */
 async function processFile(filename: string) {
-  // parse file for wasm blocks
+  let lastStackFrame: IStackFrameInfo = {at: '', unit: '', line: -1, column: -1};
+  // read file content, exit early if no EmWasm was found at all
   let content = fs.readFileSync(filename, {encoding: 'utf-8'});
-  let blocks = parseFileContent(content, filename);
-  if (!blocks.length) return;
-  console.log(`${blocks.length} wasm code blocks found in ${filename}`);
+  if (content.indexOf('EmWasm') === -1) return;
 
-  // iterate file blocks until done
-  while (blocks.length) {
-    // should only load one description a time
+  // loop until all EmWasmReadExit errors are resolved
+  while (true) {
+    // load module (one description a time)
     UNITS.length = 0;
     // TODO: ES6 module loading support
     loadModule(filename);
     //await loadModuleES6(filename);
-    if (!UNITS.length) {
-      console.warn('Warning: ##EMWASM## block without call to EmWasm** found, skipping');
-      break;
-    }
+
+    // done if the module does not throw EmWasmReadExit anymore
+    if (!UNITS.length) break;
+
+    // get stack position, error if we dont make any progress
     const wdef = UNITS[0];
-    const blockId = identifyBlock(wdef, blocks, filename, content);
-    const block = blocks[blockId];
-    console.log(`\n'${wdef.definition.name}' at ${filename}, offset [${block.start},${block.end}]:\n`);
+    const stackFrame = getStackFrame(parseCallStack(wdef.stack), filename);
+    if (lastStackFrame.line === stackFrame.line && lastStackFrame.column === stackFrame.column) {
+      throw new Error(`unable to parse/compile EmWasm call at ${filename}:${stackFrame.line}:${stackFrame.column}`);
+    }
+    lastStackFrame = stackFrame;
+
+    // match stack position to source pos
+    const block = identifyDefinitionBlock(stackFrame, content);
 
     // compile & create new block
     const wasm = compileEmscripten(wdef.definition);
-    const blockReplace = createCompiledBlock(wasm, wdef);
+    const blockReplace = createRuntimeDefinition(wasm, wdef);
 
     // write output
     const final: string[] = [content.slice(0, block.start), blockReplace, content.slice(block.end)];
     fs.writeFileSync(filename, final.join(''));
 
-    // re-parse
+    // re-read content
     content = fs.readFileSync(filename, {encoding: 'utf-8'});
-    blocks = parseFileContent(content, filename);
   }
 }
 
@@ -308,14 +305,17 @@ async function processFile(filename: string) {
 const DEFAULT_GLOB = ['./**/*.wasm.js']
 
 
+/**
+ * Run in watch mode.
+ */
 function runWatcher(args: string[]) {
   args.splice(args.indexOf('-w'), 1);
   const pattern = args.length ? args : DEFAULT_GLOB;
   console.log(`Starting watch mode with pattern ${pattern.join(' ')}`);
-  chokidar.watch(pattern).on('all', (event, filename) => {
+  chokidar.watch(pattern).on('all', async (event, filename) => {
     if (['add', 'change'].includes(event)) {
       try {
-        processFile(filename);
+        await processFile(filename);
       } catch (e) {
         console.error(`Error while processing ${filename}:`);
         console.log(e);

@@ -77,7 +77,7 @@ interface IWasmDefinitionAsyncModule extends IWasmDefinitionAsync {
 interface IWasmDefinitionAsyncInstance extends IWasmDefinitionAsync {
   type: OutputType.INSTANCE;
 }
-
+// TODO: is there a way to infer export/import typing across lazy bytes --> module instantiation?
 
 // extends WebAssembly.Instance with proper exports typings
 export interface WasmInstance<T extends IWasmDefinition> extends WebAssembly.Instance {
@@ -114,33 +114,25 @@ declare const _emwasmCtx: _IEmWasmCtx;
 
 
 /**
- * Inline wasm from a source definition.
+ * Embed wasm inline from a source definition.
  *
- * The processing happens in several stages:
+ * coding stage\
+ * Place a `EmWasm` call with a valid wasm source definition (see `IWasmDefinition`)
+ * in a TS source file.
  *
- * 1. coding stage
- * Place a `EmWasm` call with a valid wasm source definition (see `IWasmDefinition` above)
- * in a TS source file. Ideally the source module has no complicated imports
- * (close to leaves in dependency tree, no cycling).
+ * `EmWasm` with its source definition has a few additional coding restrictions:
+ *   - The source module should not no complicated imports (close to leaves in dependency tree,
+ *     no cycling) and should import `EmWasm` directly.
+ *   - The definition must be coded inline as literal object, eg. `EmWasm({...})`.
+ *   - All `EmWasm` calls must execute on import of the module (e.g. defined at top level),
+ *     as the compiler script relies on partial import execution.
+ *   - Importing the module should be side-effect free, eg. not contain other complicated
+ *     state altering constructs at top level.
+ *   - Values provided to the source definition must be final and not change later at runtime.
+ *     This results from the fact, that most values get compiled into the wasm binary and
+ *     cannot be altered later on anymore.
  *
- * `EmWasm` and source definition come with some restrictions:
- * - A definition must be surrounded by special sentinel comments as of
- *
- *      `EmWasm( /* ##EMWASM## *\/ {..your definition goes here..} /* ##\EMWASM## *\/ )`
- *
- *   (without the \ after the *). Without those sentinels the compiler script will
- *   not find the corresponding code blocks. `EmWasm` with the sentinels currently
- *   operates as a source macro, therefore every source definition must have its own
- *   `EmWasm` + sentinels call surrounding it literally in source. Any sort of
- *   function or identifier indirection will either not compile or scramble the JS source.
- * - Values provided to the source definition must be final and not change later at runtime.
- *   This results from the fact, that most values get compiled into the wasm binary and cannot
- *   be altered anymore.
- *
- * Some of the restrictions above might get lifted with more advanced AST parsing
- * in the future.
- *
- * 2. compile stage
+ * compile stage\
  * After TS compilation run `emwasm` on files containing `EmWasm` calls.
  * `emwasm` grabs the source definitions from partial execution, compiles them into
  * wasm binaries and replaces the source definitions with base64 encoded runtime definitions.
@@ -148,7 +140,7 @@ declare const _emwasmCtx: _IEmWasmCtx;
  * Alternatively run `emwasm` in watch mode with `emwasm -w glob*pattern`.
  * Note: `emwasm` does not yet work with ES6 modules.
  *
- * 3. runtime stage
+ * runtime stage\
  * At runtime `EmWasm` decodes the base64 wasm data and returns the requested output type
  * (bytes, module or instance; as promises for async mode).
  * If the compilation step was skipped in between, `EmWasm` will throw an error.

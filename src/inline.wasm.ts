@@ -4,7 +4,7 @@ const SETTINGS = {
   chunkSize: 4096
 }
 
-const unit = EmWasm( /* ##EMWASM## */ {
+const unit = EmWasm({
   name: 'unit',
   type: OutputType.INSTANCE,
   mode: OutputMode.SYNC,
@@ -35,7 +35,7 @@ const unit = EmWasm( /* ##EMWASM## */ {
     return dst - TARGET;
   }
   `
-} /* ##\EMWASM## */ );
+});
 
 
 const CHUNK = new Uint8Array(unit.exports.memory.buffer, unit.exports.chunk_addr(), SETTINGS.chunkSize);
@@ -69,9 +69,7 @@ console.log(
 const env = {jsadd: (a: number, b: number) => a + b}
 
 
-export const second = EmWasm(
-  // ##EMWASM##
-  {
+export const second = EmWasm({
     name: 'second',
     type: OutputType.BYTES,
     mode: OutputMode.SYNC,
@@ -92,6 +90,4 @@ export const second = EmWasm(
       return jsadd(a, b);
     }
     `
-  }
-  // ##\EMWASM##
-);
+});
