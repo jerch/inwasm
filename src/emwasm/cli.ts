@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
 import * as fs from 'fs';
-import * as os from 'os';
 import * as path from 'path';
 import { execSync } from 'child_process';
 import { IWasmDefinition, _IEmWasmCtx } from './definitions';
+import { run as emscripten_run, getSdkPath } from './emscripten';
 
 import * as chokidar from 'chokidar';
 
@@ -26,7 +26,118 @@ interface IStackFrameInfo {
 }
 
 
+type CompilerRunner = (def: IWasmDefinition, buildDir: string) => Buffer | Uint8Array;
+
+
 class EmWasmReadExit extends Error { }
+
+
+/**
+ * clang specifics
+ *
+ * https://lld.llvm.org/WebAssembly.html
+ * https://clang.llvm.org/docs/AttributeReference.html
+ * https://github.com/schellingb/ClangWasm
+ * https://surma.dev/things/c-to-webassembly/
+ * https://github.com/jedisct1/libclang_rt.builtins-wasm32.a
+ * https://depth-first.com/articles/2019/10/16/compiling-c-to-webassembly-and-running-it-without-emscripten/
+ *
+ * __attribute__((import_module("env"), import_name("externalFunction"))) void externalFunction(void);
+ * __attribute__((export_name(<name>)))
+ * __attribute__((import_module(<module_name>)))
+ * __attribute__((import_name(<name>)))
+ */
+
+
+// TODO: cleanup this mess
+// TODO: investigate on rust, assemblyscript, make|shell template
+const COMPILE_BACKENDS: {[key: string]: CompilerRunner} = {
+  'C': (def: IWasmDefinition, buildDir: string) => {
+    // TODO: copy additional files
+    process.chdir(buildDir);
+    const src = `${def.name}.c`;
+    const target = `${def.name}.wasm`;
+    fs.writeFileSync(src, def.code);
+    // TODO: apply compile options properly
+    const opt = `-O3`;
+    const defines = Object.entries(def.compile?.defines || {})
+      .map(el => `-D${el[0]}=${el[1]}`).join(' ');
+    const _funcs = Object.entries(def.exports)
+      .filter(el => typeof el[1] === 'function')
+      .map(el => `"_${el[0]}"`)
+      .join(',');
+    let add_switches = '';
+    if (def.compile && def.compile.switches) {
+      add_switches = def.compile.switches.join(' ');
+    }
+    const switches = `-s ERROR_ON_UNDEFINED_SYMBOLS=0 -s WARN_ON_UNDEFINED_SYMBOLS=0 ` + add_switches;
+    const funcs = `-s EXPORTED_FUNCTIONS='[${_funcs}]'`;
+    const call = `emcc ${opt} ${defines} ${funcs} ${switches} --no-entry ${src} -o ${target}`;
+    emscripten_run(call);
+    return fs.readFileSync(target);
+  },
+  'Clang-C': (def: IWasmDefinition, buildDir: string) => {
+    // TODO: copy additional files
+    process.chdir(buildDir);
+    const src = `${def.name}.c`;
+    const target = `${def.name}.wasm`;
+    fs.writeFileSync(src, def.code);
+    // TODO: apply compile options properly
+    const opt = `-O3`;
+    const defines = Object.entries(def.compile?.defines || {})
+      .map(el => `-D${el[0]}=${el[1]}`).join(' ');
+    let add_switches = '';
+    if (def.compile && def.compile.switches) {
+      add_switches = def.compile.switches.join(' ');
+    }
+    // clang tests:
+    const ff = Object.entries(def.exports)
+      .filter(el => typeof el[1] === 'function' || el[1] instanceof WebAssembly.Global)
+      .map(el => `--export=${el[0]}`)
+      .join(',');
+    const clang = path.join(getSdkPath(), 'upstream', 'bin', 'clang');
+    const call = `${clang} --target=wasm32-unknown-unknown --no-standard-libraries -Wl,${ff} -Wl,--no-entry -Wl,--lto-O3 ${opt} -flto ${defines} -o ${target} ${src}`;
+    emscripten_run(call);
+    return fs.readFileSync(target);
+  },
+  'Zig': (def: IWasmDefinition, buildDir: string) => {
+    const wd = process.cwd();
+    process.chdir(buildDir);
+    const src = `${def.name}.zig`;
+    const target = `${def.name}.wasm`;
+    fs.writeFileSync(src, def.code);
+    const ff = Object.entries(def.exports)
+      .filter(el => typeof el[1] === 'function' || el[1] instanceof WebAssembly.Global)
+      .map(el => `--export=${el[0]}`)
+      .join(' ');
+    const zig = '~/Dokumente/github/wasm-dummy/zig/zig-linux-x86_64-0.10.0-dev.2978+803376708/zig';
+    const call = `${zig} build-lib ${src} -target wasm32-freestanding -dynamic -O ReleaseFast ${ff}`;
+    console.log(call);
+    execSync(call, { shell: '/bin/bash', stdio: 'inherit' });
+    // wabt wasm-strip
+    const wasm_strip = path.join(wd, 'node_modules/wabt/bin/wasm-strip');
+    execSync(`${wasm_strip} ${target}`, { shell: '/bin/bash', stdio: 'inherit' });
+    return fs.readFileSync(target);
+  },
+  'wat': (def: IWasmDefinition, buildDir: string) => {
+    const wd = process.cwd();
+    process.chdir(buildDir);
+    const src = `${def.name}.wat`;
+    const target = `${def.name}.wasm`;
+    fs.writeFileSync(src, def.code);
+    const wat2wasm = path.join(wd, 'node_modules/wabt/bin/wat2wasm');
+    const wasm_strip = path.join(wd, 'node_modules/wabt/bin/wasm-strip');
+    const call = `${wat2wasm} ${src} && ${wasm_strip} ${target}`;
+    console.log(call);
+    execSync(call, { shell: '/bin/bash', stdio: 'inherit' });
+    return fs.readFileSync(target);
+  },
+  'custom': (def: IWasmDefinition, buildDir: string) => {
+    if (def.customRunner)
+      return def.customRunner(def, buildDir);
+    throw new Error('no customRunner defined');
+  }
+};
 
 
 // global var to hold loaded description
@@ -132,87 +243,22 @@ function identifyDefinitionBlock(stackFrame: IStackFrameInfo, content: string): 
 
 
 /**
- * TODO: compileClang
- *
- * https://lld.llvm.org/WebAssembly.html
- * https://clang.llvm.org/docs/AttributeReference.html
- * https://github.com/schellingb/ClangWasm
- * https://surma.dev/things/c-to-webassembly/
- * https://github.com/jedisct1/libclang_rt.builtins-wasm32.a
- * https://depth-first.com/articles/2019/10/16/compiling-c-to-webassembly-and-running-it-without-emscripten/
- *
- * __attribute__((import_module("env"), import_name("externalFunction"))) void externalFunction(void);
- * __attribute__((export_name(<name>)))
- * __attribute__((import_module(<module_name>)))
- * __attribute__((import_name(<name>)))
+ * Prepare build folder and call compiler backend.
  */
-
-/**
- * TODO: support for AS - assemblyscript, zig or rust?
- */
-
-
-/**
- * Compile with emscripten.
- */
-function compileEmscripten(definition: IWasmDefinition): Buffer {
-  // FIXME: needs major overhaul:
-  //  - eg. do compilation in local folder to preserve wasm files
-  //  - name wasm files from unit name
-  //  - multiple feature sets?
-  //  - map all relevant compile settings
-  //  - generate a warning, if sync=true and wasm size > 4096
-  let result;
+function compileWasm(def: IWasmDefinition, filename: string): Buffer {
+  // FIXME: ensure we are at project root path
+  // create build folders
+  const baseDir = path.resolve('./emwasm-builds');
+  if (!fs.existsSync(baseDir)) fs.mkdirSync(baseDir);
+  const buildDir = path.join(baseDir, filename, def.name);
+  if (!fs.existsSync(buildDir)) fs.mkdirSync(buildDir, {recursive: true});
   const wd = process.cwd();
-  let tmpDir;
-  const appPrefix = 'em-wasm_';
+  let result: Buffer;
   try {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), appPrefix));
-    process.chdir(tmpDir);
-    const sdk = `source ${wd}/emsdk/emsdk_env.sh > /dev/null 2>&1`;
-    const src = 'src.c';
-    const target = `${definition.name}.wasm`;
-    const opt = `-O3`;
-    fs.writeFileSync(src, definition.code);
-    const defines = Object.entries(definition.compile?.defines || {})
-      .map(el => `-D${el[0]}=${el[1]}`).join(' ');
-    const _funcs = Object.entries(definition.exports)
-      .filter(el => typeof el[1] === 'function')
-      .map(el => `"_${el[0]}"`)
-      .join(',');
-    let add_switches = '';
-    if (definition.compile && definition.compile.switches) {
-      add_switches = definition.compile.switches.join(' ');
-    }
-    const switches = `-s ERROR_ON_UNDEFINED_SYMBOLS=0 -s WARN_ON_UNDEFINED_SYMBOLS=0 ` + add_switches;
-    const funcs = `-s EXPORTED_FUNCTIONS='[${_funcs}]'`;
-    const call = `${sdk} && emcc ${opt} ${defines} ${funcs} ${switches} --no-entry ${src} -o ${target}`;
-    console.log(call);
-    execSync(call, { shell: '/bin/bash', stdio: 'inherit' });
-
-    //// clang tests:
-    //console.log(definition.exports);
-    //const ff = Object.entries(definition.exports)
-    //  .filter(el => typeof el[1] === 'function' || el[1] instanceof WebAssembly.Global)
-    //  .map(el => `--export=${el[0]}`)
-    //  .join(',');
-    //console.log(ff);
-    ////const symex = definition.name === 'unit' ? '-Wl,--export=CHUNK' : '';
-    //const call = `${wd}/../../playground/emsdk/upstream/bin/clang --target=wasm32 --no-standard-libraries -Wl,${ff} -Wl,--no-entry -Wl,--lto-O3 ${opt} -flto ${defines} -o ${target} ${src}`;
-    //console.log(call);
-    //execSync(call, {shell: '/bin/bash'});
-
-    // FIXME: unset result in case of error
-    result = fs.readFileSync(target);
-  } catch (e) {
-    console.log(e);
+    result = Buffer.from(COMPILE_BACKENDS[def.srctype](def, buildDir));
+  } finally {
+    process.chdir(wd);
   }
-  finally {
-    try {
-      if (tmpDir) fs.rmSync(tmpDir, { recursive: true });
-    } catch (e) { }
-  }
-  process.chdir(wd);
   if (!result) throw new Error('compile error');
   return result;
 }
@@ -300,7 +346,7 @@ async function processFile(filename: string) {
       const block = identifyDefinitionBlock(stackFrame, content);
 
       // compile & create new block
-      const wasm = compileEmscripten(wdef.definition);
+      const wasm = compileWasm(wdef.definition, filename);
       const blockReplace = createRuntimeDefinition(wasm, wdef);
 
       // push parts with replacement

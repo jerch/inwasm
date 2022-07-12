@@ -26,30 +26,31 @@ export const enum OutputMode {
  */
 export interface IWasmDefinition {
   // Name of the wasm target, should be unique.
-  name: string,
+  name: string;
   // Type determines, whether to provide bytes | module | instance at runtime.
-  type: OutputType,
+  type: OutputType;
   // Sync (discouraged) vs. async wasm bootstrapping at runtime.
   mode: OutputMode,
   // Exported wasm functions, for proper TS typing simply stub them.
-  exports: {[key: string]: Function | WebAssembly.Global},
+  exports: {[key: string]: Function | WebAssembly.Global};
   // Name of the env import object (must be visible at runtime). Only used for OutputType.INSTANCE.
-  imports?: string,
+  imports?: string;
   // whether to treat `code` below as C or C++ source.
-  srctype: 'C' | 'C++',
+  srctype: 'C' | 'C++' | 'Clang-C' | 'Zig' | 'wat' | 'custom';
   // custom compiler settings
   compile?: {
     // Custom cmdline defines, e.g. {ABC: 123} provided as -DABC=123 to the compiler.
-    defines?: {[key: string]: string | number},
+    defines?: {[key: string]: string | number};
     // Additional include paths, should be absolute. (TODO...)
-    include?: string[],
+    include?: string[];
     // Additional source files (copied over). (TODO...)
-    sources?: string[],
+    sources?: string[];
     // FIXME: check support for -lxy with wasm
     //libs?: string[],
     // Custom cmdline switches, overriding any from above. (TODO...)
-    switches?: string[],
-  }
+    switches?: string[];
+  };
+  customRunner?: (definition: IWasmDefinition, buildDir: string) => Uint8Array;
   // Inline source code (C or C++).
   code: string
 }

@@ -122,17 +122,17 @@ export const second = EmWasm({
   name: 'second',
   type: OutputType.BYTES,
   mode: OutputMode.SYNC,
-  srctype: 'C',
+  srctype: 'Clang-C',
   imports: 'env',
   exports: {
     add: (a: number, b: number) => 0
   },
   code: `
     // forward decl w'o real impl (marked for import by emscripten)
-    int jsadd(int a, int b);
+    //int jsadd(int a, int b);
 
     // clang style
-    //__attribute__((import_module("env"), import_name("jsadd"))) int jsadd(int a, int b);
+    __attribute__((import_module("env"), import_name("jsadd"))) int jsadd(int a, int b);
 
     // some silly function
     int add(int a, int b) {
@@ -140,3 +140,70 @@ export const second = EmWasm({
     }
     `
 });
+
+
+// TODO: commented out until zig auto-bootstrapping works...
+//const fibonacci_zig = EmWasm({
+//  name: 'fibonacci',
+//  type: OutputType.INSTANCE,
+//  mode: OutputMode.SYNC,
+//  srctype: 'Zig',
+//  exports: {
+//    fibonacci: (index: number) => 0
+//  },
+//  code: `
+//  export fn fibonacci(index: u32) u32 {
+//    if (index < 2) return index;
+//    return fibonacci(index - 1) + fibonacci(index - 2);
+//  }
+//  `
+//});
+//console.log(fibonacci_zig.exports.fibonacci(5));
+//console.log(fibonacci_zig.exports.fibonacci(20));
+
+
+// srctype: wat
+const from_wat = EmWasm({
+  name: 'from_wat',
+  type: OutputType.INSTANCE,
+  mode: OutputMode.SYNC,
+  srctype: 'wat',
+  imports: 'env',
+  exports: {
+    add: (a: number, b: number) => 0
+  },
+  code: `
+  (module
+    (type $t0 (func (param i32 i32) (result i32)))
+    (import "env" "jsadd" (func $env.jsadd (type $t0)))
+    (func $add (type $t0) (param $p0 i32) (param $p1 i32) (result i32)
+      local.get $p0
+      local.get $p1
+      call $env.jsadd)
+    (memory $memory 2)
+    (export "memory" (memory 0))
+    (export "add" (func $add)))
+    `
+});
+console.log(from_wat.exports.add(23, 42));
+
+// totally custom
+const custom = EmWasm({
+  name: 'custom',
+  type: OutputType.INSTANCE,
+  mode: OutputMode.SYNC,
+  srctype: 'custom',
+  customRunner: (def, buildDir) => {
+    const cp = require('child_process');
+    const fs = require('fs');
+    cp.execSync('cd wasm && ./build.sh', { shell: '/bin/bash', stdio: 'inherit' });
+    return fs.readFileSync('wasm/convert.wasm');
+  },
+  exports: {
+    chunk_addr: () => 0,
+    target_addr: () => 0,
+    convert: (length: number) => 0
+  },
+  code: ''
+});
+console.log(custom.exports);

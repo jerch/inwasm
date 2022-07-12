@@ -8,3 +8,5 @@
 /wasm/settings.json
 /src/wasm.ts
 /emsdk
+/emwasm-builds
+/zig
