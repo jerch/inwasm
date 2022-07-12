@@ -12,7 +12,7 @@ export const enum OutputType {
 
 /**
  * Whether `EmWasm` returns the requested type sync or async (promise).
- * Note that synchronous processing of wasm modules/instance is highly restricted
+ * Note that synchronous processing of wasm modules/instances is highly restricted
  * in browsers' main JS context (works only reliable in nodejs or a web worker).
  */
 export const enum OutputMode {
@@ -31,6 +31,12 @@ export interface IWasmDefinition {
   type: OutputType,
   // Sync (discouraged) vs. async wasm bootstrapping at runtime.
   mode: OutputMode,
+  // Exported wasm functions, for proper TS typing simply stub them.
+  exports: {[key: string]: Function | WebAssembly.Global},
+  // Name of the env import object (must be visible at runtime). Only used for OutputType.INSTANCE.
+  imports?: string,
+  // whether to treat `code` below as C or C++ source.
+  srctype: 'C' | 'C++',
   // custom compiler settings
   compile?: {
     // Custom cmdline defines, e.g. {ABC: 123} provided as -DABC=123 to the compiler.
@@ -44,12 +50,6 @@ export interface IWasmDefinition {
     // Custom cmdline switches, overriding any from above. (TODO...)
     switches?: string[],
   }
-  // whether to treat `code` below as C or C++ source.
-  srctype: 'C' | 'C++',
-  // Exported wasm functions, for proper TS typing simply stub them.
-  exports: {[key: string]: Function | WebAssembly.Global},
-  // Name of the env import object (must be visible at runtime). Only used for instance.
-  imports?: string,
   // Inline source code (C or C++).
   code: string
 }
@@ -121,9 +121,10 @@ declare const _emwasmCtx: _IEmWasmCtx;
  * in a TS source file.
  *
  * `EmWasm` with its source definition has a few additional coding restrictions:
- *   - The source module should not no complicated imports (close to leaves in dependency tree,
+ *   - The source module should not have complicated imports (close to leaves in dependency tree,
  *     no cycling) and should import `EmWasm` directly.
- *   - The definition must be coded inline as literal object, eg. `EmWasm({...})`.
+ *   - The wasm definition must be coded inline as literal object on distinct
+ *     `EmWasm` calls, eg. `EmWasm({...})`.
  *   - All `EmWasm` calls must execute on import of the module (e.g. defined at top level),
  *     as the compiler script relies on partial import execution.
  *   - Importing the module should be side-effect free, eg. not contain other complicated

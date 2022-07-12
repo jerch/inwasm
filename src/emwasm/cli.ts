@@ -287,6 +287,7 @@ async function processFile(filename: string) {
 
     const final: string[] = [];
     let lastEnd = 0;
+    // FIXME: this expects UNITS to be sorted by start!!
     for (const wdef of UNITS) {
       // get stack position, error if we dont make any progress
       const stackFrame = getStackFrame(parseCallStack(wdef.stack), filename);
