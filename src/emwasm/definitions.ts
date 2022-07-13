@@ -36,7 +36,7 @@ export interface IWasmDefinition {
   // Name of the env import object (must be visible at runtime). Only used for OutputType.INSTANCE.
   imports?: string;
   // whether to treat `code` below as C or C++ source.
-  srctype: 'C' | 'C++' | 'Clang-C' | 'Zig' | 'wat' | 'custom';
+  srctype: 'C' | 'C++' | 'Clang-C' | 'Zig' | 'wat' | 'custom' | 'Rust';
   // custom compiler settings
   compile?: {
     // Custom cmdline defines, e.g. {ABC: 123} provided as -DABC=123 to the compiler.

@@ -207,3 +207,23 @@ const custom = EmWasm({
   code: ''
 });
 console.log(custom.exports);
+
+
+// rust
+const rust = EmWasm({
+  name: 'doubled',
+  type: OutputType.INSTANCE,
+  mode: OutputMode.SYNC,
+  srctype: 'Rust',
+  exports: {
+    doubled: (a: number) => 0
+  },
+  code: `
+  #[no_mangle]
+  pub extern fn doubled(x: i32) -> i32 {
+    x * 2
+  }
+  `
+});
+console.log(rust.exports.doubled(66));
+console.log(rust.exports.doubled(-333));

@@ -11,6 +11,8 @@ import * as chokidar from 'chokidar';
 import * as acorn from 'acorn';
 import * as walk from 'acorn-walk';
 
+import { green } from "colorette"
+
 
 interface IWasmSourceDefinition {
   definition: IWasmDefinition;
@@ -50,8 +52,8 @@ class EmWasmReadExit extends Error { }
 
 
 // TODO: cleanup this mess
-// TODO: investigate on rust, assemblyscript, make|shell template
-const COMPILE_BACKENDS: {[key: string]: CompilerRunner} = {
+// TODO: investigate on assemblyscript, make|shell template
+const COMPILER_RUNNERS: {[key: string]: CompilerRunner} = {
   'C': (def: IWasmDefinition, buildDir: string) => {
     // TODO: copy additional files
     process.chdir(buildDir);
@@ -90,7 +92,6 @@ const COMPILE_BACKENDS: {[key: string]: CompilerRunner} = {
     if (def.compile && def.compile.switches) {
       add_switches = def.compile.switches.join(' ');
     }
-    // clang tests:
     const ff = Object.entries(def.exports)
       .filter(el => typeof el[1] === 'function' || el[1] instanceof WebAssembly.Global)
       .map(el => `--export=${el[0]}`)
@@ -114,7 +115,6 @@ const COMPILE_BACKENDS: {[key: string]: CompilerRunner} = {
     const call = `${zig} build-lib ${src} -target wasm32-freestanding -dynamic -O ReleaseFast ${ff}`;
     console.log(call);
     execSync(call, { shell: '/bin/bash', stdio: 'inherit' });
-    // wabt wasm-strip
     const wasm_strip = path.join(wd, 'node_modules/wabt/bin/wasm-strip');
     execSync(`${wasm_strip} ${target}`, { shell: '/bin/bash', stdio: 'inherit' });
     return fs.readFileSync(target);
@@ -136,6 +136,23 @@ const COMPILE_BACKENDS: {[key: string]: CompilerRunner} = {
     if (def.customRunner)
       return def.customRunner(def, buildDir);
     throw new Error('no customRunner defined');
+  },
+  'Rust': (def: IWasmDefinition, buildDir: string) => {
+    // NOTE: expects to have a valid cargo installation in PATH!!
+    const wd = process.cwd();
+    execSync(`cargo version`, { shell: '/bin/bash' });
+    fs.rmdirSync(buildDir, { recursive: true });
+    process.chdir(path.dirname(buildDir));
+    const src = path.join(buildDir, 'src', 'lib.rs');
+    const target = path.join(buildDir, 'target', 'wasm32-unknown-unknown', 'release', `${def.name}.wasm`);
+    execSync(`cargo new ${def.name} --lib`, { shell: '/bin/bash', stdio: 'inherit' });
+    process.chdir(buildDir);
+    fs.writeFileSync(src, def.code);
+    fs.appendFileSync('Cargo.toml', '\n[lib]\ncrate-type = ["cdylib"]\n[profile.release]\nlto = true\n');
+    execSync(`cargo build --target wasm32-unknown-unknown --release`, { shell: '/bin/bash', stdio: 'inherit' });
+    const wasm_strip = path.join(wd, 'node_modules/wabt/bin/wasm-strip');
+    execSync(`${wasm_strip} ${target}`, { shell: '/bin/bash', stdio: 'inherit' });
+    return fs.readFileSync(target);
   }
 };
 
@@ -242,6 +259,16 @@ function identifyDefinitionBlock(stackFrame: IStackFrameInfo, content: string): 
 }
 
 
+function formatBytes(bytes: number, decimals: number = 2): string {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+}
+
+
 /**
  * Prepare build folder and call compiler backend.
  */
@@ -255,11 +282,13 @@ function compileWasm(def: IWasmDefinition, filename: string): Buffer {
   const wd = process.cwd();
   let result: Buffer;
   try {
-    result = Buffer.from(COMPILE_BACKENDS[def.srctype](def, buildDir));
+    result = Buffer.from(COMPILER_RUNNERS[def.srctype](def, buildDir));
+    fs.writeFileSync(path.join(buildDir, `${def.name}.wasm`), result);
   } finally {
     process.chdir(wd);
   }
-  if (!result) throw new Error('compile error');
+  if (!result || !result.length) throw new Error('compile error');
+  console.log(green('[emwasm compile]'), `Successfully built '${def.name}' (${formatBytes(result.length)}).\n`);
   return result;
 }
 
