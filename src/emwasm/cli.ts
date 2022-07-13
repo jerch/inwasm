@@ -283,11 +283,17 @@ function compileWasm(def: IWasmDefinition, filename: string): Buffer {
   let result: Buffer;
   try {
     result = Buffer.from(COMPILER_RUNNERS[def.srctype](def, buildDir));
-    fs.writeFileSync(path.join(buildDir, `${def.name}.wasm`), result);
+    // FIXME: abort on error...
   } finally {
     process.chdir(wd);
   }
   if (!result || !result.length) throw new Error('compile error');
+  // generate final.wasm and final.wat file in build folder
+  const target = path.join(buildDir, 'final');
+  fs.writeFileSync(target + '.wasm', result);
+  const wasm2wat = path.join(wd, 'node_modules/wabt/bin/wasm2wat');
+  const call = `${wasm2wat} ${target + '.wasm'} -o ${target + '.wat'}`;
+  execSync(call, { shell: '/bin/bash', stdio: 'inherit' });
   console.log(green('[emwasm compile]'), `Successfully built '${def.name}' (${formatBytes(result.length)}).\n`);
   return result;
 }
