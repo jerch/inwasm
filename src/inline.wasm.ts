@@ -1,4 +1,4 @@
-import { EmWasm, OutputMode, OutputType } from './emwasm/definitions';
+import { EmWasm, ExtractDefinition, OutputMode, OutputType, WasmModule, WasmInstance, WebAssemblyExt } from './emwasm/definitions';
 
 const SETTINGS = {
   chunkSize: 16384
@@ -227,3 +227,41 @@ const rust = EmWasm({
 });
 console.log(rust.exports.doubled(66));
 console.log(rust.exports.doubled(-333));
+
+
+
+
+
+
+/**
+ * test proper type inference with manual bootstrapping
+ */
+
+// generic losing all type info
+const mod = new WebAssembly.Module(second);
+
+// definition typed module
+const mod_typed1: WasmModule<ExtractDefinition<typeof second>> = mod;
+const mod_typed2 = mod as WasmModule<ExtractDefinition<typeof second>>;
+
+// generic instance
+const inst = new WebAssembly.Instance(mod, {env: env});
+
+// definition typed module from <typeof WasmBytes<T>>
+// FIXME: does not work yet due to weird memory type hack
+//const inst_typed1: WasmInstance<ExtractDefinition<typeof second>> = inst;
+const inst_typed2 = inst as WasmInstance<ExtractDefinition<typeof second>>;
+
+// definition typed module from <typeof WasmBytes<T>>
+// FIXME: does not work yet due to weird memory type hack
+// FIXME: also needs import typing...
+// const inst_typed3: WasmInstance<ExtractDefinition<typeof mod_typed1>> =
+//   new WebAssembly.Instance(mod_typed1, {env: env});
+const inst_typed4 = new WebAssembly.Instance(mod_typed1, {env: env}) as
+    WasmInstance<ExtractDefinition<typeof mod_typed1>>;
+
+
+
+// re-declare WebAssembly type
+const WAE = WebAssembly as WebAssemblyExt;
+const cc = new WAE.Module(second);

@@ -32,7 +32,7 @@ export interface IWasmDefinition {
   // Sync (discouraged) vs. async wasm bootstrapping at runtime.
   mode: OutputMode,
   // Exported wasm functions, for proper TS typing simply stub them.
-  exports: {[key: string]: Function | WebAssembly.Global};
+  exports: { [key: string]: Function | WebAssembly.Global };
   // Name of the env import object (must be visible at runtime). Only used for OutputType.INSTANCE.
   imports?: string;
   // whether to treat `code` below as C or C++ source.
@@ -40,7 +40,7 @@ export interface IWasmDefinition {
   // custom compiler settings
   compile?: {
     // Custom cmdline defines, e.g. {ABC: 123} provided as -DABC=123 to the compiler.
-    defines?: {[key: string]: string | number};
+    defines?: { [key: string]: string | number };
     // Additional include paths, should be absolute. (TODO...)
     include?: string[];
     // Additional source files (copied over). (TODO...)
@@ -54,36 +54,62 @@ export interface IWasmDefinition {
   // Inline source code (C or C++).
   code: string
 }
-interface IWasmDefinitionSync extends IWasmDefinition {
+export interface IWasmDefinitionSync extends IWasmDefinition {
   mode: OutputMode.SYNC
 }
-interface IWasmDefinitionAsync extends IWasmDefinition {
+export interface IWasmDefinitionAsync extends IWasmDefinition {
   mode: OutputMode.ASYNC
 }
-interface IWasmDefinitionSyncBytes extends IWasmDefinitionSync {
+export interface IWasmDefinitionSyncBytes extends IWasmDefinitionSync {
   type: OutputType.BYTES;
 }
-interface IWasmDefinitionSyncModule extends IWasmDefinitionSync {
+export interface IWasmDefinitionSyncModule extends IWasmDefinitionSync {
   type: OutputType.MODULE;
 }
-interface IWasmDefinitionSyncInstance extends IWasmDefinitionSync {
+export interface IWasmDefinitionSyncInstance extends IWasmDefinitionSync {
   type: OutputType.INSTANCE;
 }
-interface IWasmDefinitionAsyncBytes extends IWasmDefinitionAsync {
+export interface IWasmDefinitionAsyncBytes extends IWasmDefinitionAsync {
   type: OutputType.BYTES;
 }
-interface IWasmDefinitionAsyncModule extends IWasmDefinitionAsync {
+export interface IWasmDefinitionAsyncModule extends IWasmDefinitionAsync {
   type: OutputType.MODULE;
 }
-interface IWasmDefinitionAsyncInstance extends IWasmDefinitionAsync {
+export interface IWasmDefinitionAsyncInstance extends IWasmDefinitionAsync {
   type: OutputType.INSTANCE;
 }
-// TODO: is there a way to infer export/import typing across lazy bytes --> module instantiation?
+
+
+// dummy type to carry forward definition type info on BYTES
+export interface WasmBytes<T extends IWasmDefinition> extends Uint8Array { }
+
+// dummy type to carry forward definition type info on MODULE
+export interface WasmModule<T extends IWasmDefinition> extends WebAssembly.Module { }
 
 // extends WebAssembly.Instance with proper exports typings
+// FIXME: needs better memory story (not always exported)
 export interface WasmInstance<T extends IWasmDefinition> extends WebAssembly.Instance {
-  exports: {memory: WebAssembly.Memory} & T['exports'];
+  exports: { memory: WebAssembly.Memory } & T['exports'];
 }
+
+// Type helper to infer wasm definition from BYTES, MODULE and INSTANCE manually.
+export type ExtractDefinition<Type> = Type extends WasmBytes<infer X> ? X
+  : Type extends Promise<WasmBytes<infer X>> ? X
+  : Type extends WasmModule<infer X> ? X
+  : Type extends Promise<WasmModule<infer X>> ? X
+  : Type extends WasmInstance<infer X> ? X
+  : Type extends Promise<WasmInstance<infer X>> ? X
+  : never;
+
+
+// TODO: re-type WebAssembly to preserve proper definition inference
+export interface WebAssemblyExt {
+  Module: WebAssembly.Module & {
+    new<T extends any>(bytes: (T extends IWasmDefinitionSyncBytes ? WasmBytes<T> : Uint8Array)):
+      T extends IWasmDefinition ? WasmModule<T> : WebAssembly.Module;
+  }
+}
+
 
 // tiny compile ctx for emwasm
 export interface _IEmWasmCtx {
@@ -101,12 +127,12 @@ function _dec(s: string): Uint8Array {
   return r;
 }
 // runtime helper - set imports conditionally
-function _env(env: any): {env: any} | undefined {
-  return env ? {env: env} : undefined
+function _env(env: any): { env: any } | undefined {
+  return env ? { env: env } : undefined
 }
 // runtime helper - create response object
 function _res(d: string): Response {
-  return new Response(_dec(d), {status: 200, headers: {'Content-Type': 'application/wasm'}})
+  return new Response(_dec(d), { status: 200, headers: { 'Content-Type': 'application/wasm' } })
 }
 
 
@@ -147,10 +173,10 @@ declare const _emwasmCtx: _IEmWasmCtx;
  * (bytes, module or instance; as promises for async mode).
  * If the compilation step was skipped in between, `EmWasm` will throw an error.
  */
-export function EmWasm(def: IWasmDefinitionSyncBytes): Uint8Array;
-export function EmWasm(def: IWasmDefinitionAsyncBytes): Promise<Uint8Array>;
-export function EmWasm(def: IWasmDefinitionSyncModule): WebAssembly.Module;
-export function EmWasm(def: IWasmDefinitionAsyncModule): Promise<WebAssembly.Module>;
+export function EmWasm<T extends IWasmDefinitionSyncBytes>(def: T): WasmBytes<T>;
+export function EmWasm<T extends IWasmDefinitionAsyncBytes>(def: T): Promise<WasmBytes<T>>;
+export function EmWasm<T extends IWasmDefinitionSyncModule>(def: T): WasmModule<T>;
+export function EmWasm<T extends IWasmDefinitionAsyncModule>(def: T): Promise<WasmModule<T>>;
 export function EmWasm<T extends IWasmDefinitionSyncInstance>(def: T): WasmInstance<T>;
 export function EmWasm<T extends IWasmDefinitionAsyncInstance>(def: T): Promise<WasmInstance<T>>;
 export function EmWasm<T extends IWasmDefinition>(def: T): any {
@@ -158,7 +184,7 @@ export function EmWasm<T extends IWasmDefinition>(def: T): any {
     // default compiled call: wasm loading during runtime
     // for the sake of small bundling size (<900 bytes) the code is somewhat degenerated
     // see cli.ts for the meaning of the {t, s, d, e} object properties
-    const {t, s, d, e} = def as any;
+    const { t, s, d, e } = def as any;
     const W = WebAssembly;
     if (t === OutputType.BYTES) {
       if (s) return _dec(d);
