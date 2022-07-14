@@ -111,7 +111,14 @@ const COMPILER_RUNNERS: {[key: string]: CompilerRunner} = {
       .filter(el => typeof el[1] === 'function' || el[1] instanceof WebAssembly.Global)
       .map(el => `--export=${el[0]}`)
       .join(' ');
-    const zig = '~/Dokumente/github/wasm-dummy/zig/zig-linux-x86_64-0.10.0-dev.2978+803376708/zig';
+    // FIXME: better zig sdk handling...
+    let zig = '';
+    try {
+      execSync('zig version');
+      zig = 'zig';
+    } catch (e) {
+      zig = '~/Dokumente/github/wasm-dummy/zig/zig-linux-x86_64-0.10.0-dev.2978+803376708/zig';
+    }
     const call = `${zig} build-lib ${src} -target wasm32-freestanding -dynamic -O ReleaseFast ${ff}`;
     console.log(call);
     execSync(call, { shell: '/bin/bash', stdio: 'inherit' });

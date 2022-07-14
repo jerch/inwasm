@@ -142,24 +142,24 @@ export const second = EmWasm({
 });
 
 
-// TODO: commented out until zig auto-bootstrapping works...
-//const fibonacci_zig = EmWasm({
-//  name: 'fibonacci',
-//  type: OutputType.INSTANCE,
-//  mode: OutputMode.SYNC,
-//  srctype: 'Zig',
-//  exports: {
-//    fibonacci: (index: number) => 0
-//  },
-//  code: `
-//  export fn fibonacci(index: u32) u32 {
-//    if (index < 2) return index;
-//    return fibonacci(index - 1) + fibonacci(index - 2);
-//  }
-//  `
-//});
-//console.log(fibonacci_zig.exports.fibonacci(5));
-//console.log(fibonacci_zig.exports.fibonacci(20));
+// zig
+const fibonacci_zig = EmWasm({
+  name: 'fibonacci',
+  type: OutputType.INSTANCE,
+  mode: OutputMode.SYNC,
+  srctype: 'Zig',
+  exports: {
+    fibonacci: (index: number) => 0
+  },
+  code: `
+  export fn fibonacci(index: u32) u32 {
+    if (index < 2) return index;
+    return fibonacci(index - 1) + fibonacci(index - 2);
+  }
+  `
+});
+console.log(fibonacci_zig.exports.fibonacci(5));
+console.log(fibonacci_zig.exports.fibonacci(20));
 
 
 // srctype: wat
