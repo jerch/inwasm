@@ -1,4 +1,4 @@
-import { EmWasm, ExtractDefinition, OutputMode, OutputType, WasmModule, WasmInstance, WebAssemblyExt } from './emwasm/definitions';
+import { EmWasm, ExtractDefinition, OutputMode, OutputType, IWasmModule, IWasmInstance, WebAssemblyExtended, IWasmResponse } from './emwasm/definitions';
 
 const SETTINGS = {
   chunkSize: 16384
@@ -241,8 +241,8 @@ console.log(rust.exports.doubled(-333));
 const mod = new WebAssembly.Module(second);
 
 // definition typed module
-const mod_typed1: WasmModule<ExtractDefinition<typeof second>> = mod;
-const mod_typed2 = mod as WasmModule<ExtractDefinition<typeof second>>;
+const mod_typed1: IWasmModule<ExtractDefinition<typeof second>> = mod;
+const mod_typed2 = mod as IWasmModule<ExtractDefinition<typeof second>>;
 
 // generic instance
 const inst = new WebAssembly.Instance(mod, {env: env});
@@ -250,7 +250,7 @@ const inst = new WebAssembly.Instance(mod, {env: env});
 // definition typed module from <typeof WasmBytes<T>>
 // FIXME: does not work yet due to weird memory type hack
 //const inst_typed1: WasmInstance<ExtractDefinition<typeof second>> = inst;
-const inst_typed2 = inst as WasmInstance<ExtractDefinition<typeof second>>;
+const inst_typed2 = inst as IWasmInstance<ExtractDefinition<typeof second>>;
 
 // definition typed module from <typeof WasmBytes<T>>
 // FIXME: does not work yet due to weird memory type hack
@@ -258,10 +258,48 @@ const inst_typed2 = inst as WasmInstance<ExtractDefinition<typeof second>>;
 // const inst_typed3: WasmInstance<ExtractDefinition<typeof mod_typed1>> =
 //   new WebAssembly.Instance(mod_typed1, {env: env});
 const inst_typed4 = new WebAssembly.Instance(mod_typed1, {env: env}) as
-    WasmInstance<ExtractDefinition<typeof mod_typed1>>;
+    IWasmInstance<ExtractDefinition<typeof mod_typed1>>;
 
 
 
+/** typing tests on WebAssembly namespace */
+// FIXME: is there a way to test that automatically?
+/*
 // re-declare WebAssembly type
-const WAE = WebAssembly as WebAssemblyExt;
-const cc = new WAE.Module(second);
+const WAE = WebAssembly as typeof WebAssemblyExtended;
+
+// Module ctor overload
+const m_typed = new WAE.Module(second);
+const m_untyped = new WAE.Module(new Uint8Array());
+
+// Instance ctor overload
+const inst_typed = new WAE.Instance(m_typed, {env: env});
+const inst_untyped = new WAE.Instance(m_untyped);
+
+// compile overload
+const inst1 = WAE.compile(second);
+const inst2 = WAE.compile(new Uint8Array());
+
+// instantiate from bytes overload
+const inst3 = WAE.instantiate(second).then(i => i.instance);
+const inst4 = WAE.instantiate(new Uint8Array()).then(i => i.instance);
+
+// instantiate from module overload
+const inst5 = WAE.instantiate(m_typed);
+const inst6 = WAE.instantiate(m_untyped);
+
+
+// compileStreaming
+type secondDefinition = ExtractDefinition<typeof second>;
+const ff = fetch('hello') as Promise<WasmResponse<secondDefinition>>;
+const ff2: Promise<WasmResponse<secondDefinition>>  = fetch('hello');
+const ii = WAE.compileStreaming(ff2);
+
+const uu = fetch('nix');
+const xx = WAE.compileStreaming(uu);
+
+
+// instantiateStreaming
+const zz = WAE.instantiateStreaming(fetch('bla') as Promise<WasmResponse<secondDefinition>>).then(r => r.instance);
+const yy = WAE.instantiateStreaming(fetch('asd')).then(r => r.instance);
+*/

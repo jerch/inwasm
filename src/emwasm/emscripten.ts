@@ -6,6 +6,7 @@ import * as cp from 'child_process';
 const PATH_ENV_NAME = 'EMWASM_EMSDK';
 const PATH_ENV_VERSION = 'EMWASM_EMSDK_VERSION';
 
+
 export function getSdkPath(): string {
   return process.env[PATH_ENV_NAME]
     ? path.resolve(process.env[PATH_ENV_NAME])

@@ -81,35 +81,188 @@ export interface IWasmDefinitionAsyncInstance extends IWasmDefinitionAsync {
 
 
 // dummy type to carry forward definition type info on BYTES
-export interface WasmBytes<T extends IWasmDefinition> extends Uint8Array { }
+export interface IWasmBytes<T extends IWasmDefinition> extends Uint8Array { }
 
 // dummy type to carry forward definition type info on MODULE
-export interface WasmModule<T extends IWasmDefinition> extends WebAssembly.Module { }
+export interface IWasmModule<T extends IWasmDefinition> extends WebAssembly.Module { }
 
 // extends WebAssembly.Instance with proper exports typings
 // FIXME: needs better memory story (not always exported)
-export interface WasmInstance<T extends IWasmDefinition> extends WebAssembly.Instance {
+export interface IWasmInstance<T extends IWasmDefinition> extends WebAssembly.Instance {
   exports: { memory: WebAssembly.Memory } & T['exports'];
 }
 
 // Type helper to infer wasm definition from BYTES, MODULE and INSTANCE manually.
-export type ExtractDefinition<Type> = Type extends WasmBytes<infer X> ? X
-  : Type extends Promise<WasmBytes<infer X>> ? X
-  : Type extends WasmModule<infer X> ? X
-  : Type extends Promise<WasmModule<infer X>> ? X
-  : Type extends WasmInstance<infer X> ? X
-  : Type extends Promise<WasmInstance<infer X>> ? X
+export type ExtractDefinition<Type> = Type extends IWasmBytes<infer X> ? X
+  : Type extends Promise<IWasmBytes<infer X>> ? X
+  : Type extends IWasmModule<infer X> ? X
+  : Type extends Promise<IWasmModule<infer X>> ? X
+  : Type extends IWasmInstance<infer X> ? X
+  : Type extends Promise<IWasmInstance<infer X>> ? X
   : never;
 
+// Respone overload to carry definition forward
+export interface IWasmResponse<T extends IWasmDefinition> extends Response {}
 
-// TODO: re-type WebAssembly to preserve proper definition inference
-export interface WebAssemblyExt {
-  Module: WebAssembly.Module & {
-    new<T extends any>(bytes: (T extends IWasmDefinitionSyncBytes ? WasmBytes<T> : Uint8Array)):
-      T extends IWasmDefinition ? WasmModule<T> : WebAssembly.Module;
+
+/**
+ * Overload WebAssembly namespace with extended type information.
+ */
+export declare namespace WebAssemblyExtended {
+  interface CompileError extends Error {
   }
+
+  var CompileError: {
+      prototype: CompileError;
+      new(): CompileError;
+  };
+
+  interface Global {
+      value: any;
+      valueOf(): any;
+  }
+
+  var Global: {
+      prototype: Global;
+      new(descriptor: GlobalDescriptor, v?: any): Global;
+  };
+
+  interface Instance {
+      readonly exports: Exports;
+  }
+
+  var Instance: {
+      prototype: Instance;
+      new<T>(
+        module: (T extends IWasmDefinition ? IWasmModule<T> : Module),
+        importObject?: Imports
+      ): (T extends IWasmDefinition ? IWasmInstance<T> : Instance);
+  };
+
+  interface LinkError extends Error {
+  }
+
+  var LinkError: {
+      prototype: LinkError;
+      new(): LinkError;
+  };
+
+  interface Memory {
+      readonly buffer: ArrayBuffer;
+      grow(delta: number): number;
+  }
+
+  var Memory: {
+      prototype: Memory;
+      new(descriptor: MemoryDescriptor): Memory;
+  };
+
+  interface Module {
+  }
+
+  var Module: {
+      prototype: Module;
+      new<T>(bytes: (T extends IWasmDefinition ? IWasmBytes<T> : BufferSource)):
+        (T extends IWasmDefinition ? IWasmModule<T> : Module);
+      customSections(moduleObject: Module, sectionName: string): ArrayBuffer[];
+      exports(moduleObject: Module): ModuleExportDescriptor[];
+      imports(moduleObject: Module): ModuleImportDescriptor[];
+  };
+
+  interface RuntimeError extends Error {
+  }
+
+  var RuntimeError: {
+      prototype: RuntimeError;
+      new(): RuntimeError;
+  };
+
+  interface Table {
+      readonly length: number;
+      get(index: number): any;
+      grow(delta: number, value?: any): number;
+      set(index: number, value?: any): void;
+  }
+
+  var Table: {
+      prototype: Table;
+      new(descriptor: TableDescriptor, value?: any): Table;
+  };
+
+  interface GlobalDescriptor {
+      mutable?: boolean;
+      value: ValueType;
+  }
+
+  interface MemoryDescriptor {
+      initial: number;
+      maximum?: number;
+      shared?: boolean;
+  }
+
+  interface ModuleExportDescriptor {
+      kind: ImportExportKind;
+      name: string;
+  }
+
+  interface ModuleImportDescriptor {
+      kind: ImportExportKind;
+      module: string;
+      name: string;
+  }
+
+  interface TableDescriptor {
+      element: TableKind;
+      initial: number;
+      maximum?: number;
+  }
+
+  interface WebAssemblyInstantiatedSource {
+      instance: Instance;
+      module: Module;
+  }
+
+  interface IWasmInstantiatedSource<T extends IWasmDefinition> {
+    instance: IWasmInstance<T>;
+    module: IWasmModule<T>;
+  }
+
+  type ImportExportKind = "function" | "global" | "memory" | "table";
+  type TableKind = "anyfunc" | "externref";
+  type ValueType = "anyfunc" | "externref" | "f32" | "f64" | "i32" | "i64";
+  type ExportValue = Function | Global | Memory | Table;
+  type Exports = Record<string, ExportValue>;
+  type ImportValue = ExportValue | number;
+  type Imports = Record<string, ModuleImports>;
+  type ModuleImports = Record<string, ImportValue>;
+
+  function compile<T>(bytes: (T extends IWasmDefinition ? IWasmBytes<T> : BufferSource)):
+    (T extends IWasmDefinition ? Promise<IWasmModule<T>> : Promise<Module>);
+
+  function compileStreaming<T>(
+    source: (T extends IWasmDefinition ? IWasmResponse<T> | PromiseLike<IWasmResponse<T>> : Response | PromiseLike<Response>)
+  ): (T extends IWasmDefinition ? Promise<IWasmModule<T>> : Promise<Module>);
+
+  function instantiate<T>(
+    bytes: (T extends IWasmDefinition ? IWasmBytes<T> : BufferSource),
+    importObject?: Imports
+  ): (T extends IWasmDefinition ? Promise<IWasmInstantiatedSource<T>> : Promise<WebAssemblyInstantiatedSource>);
+
+  function instantiate<T>(
+    moduleObject: (T extends IWasmDefinition ? IWasmModule<T> : Module),
+    importObject?: Imports
+  ): (T extends IWasmDefinition ? Promise<IWasmInstance<T>> : Promise<Instance>);
+
+  function instantiateStreaming<T>(
+    source: (T extends IWasmDefinition ? IWasmResponse<T> | PromiseLike<IWasmResponse<T>> : Response | PromiseLike<Response>),
+    importObject?: Imports
+  ): (T extends IWasmDefinition ? Promise<IWasmInstantiatedSource<T>> : Promise<WebAssemblyInstantiatedSource>);
+
+  function validate(bytes: BufferSource): boolean;
 }
 
+
+// FIXME: apply custom types below
 
 // tiny compile ctx for emwasm
 export interface _IEmWasmCtx {
@@ -173,12 +326,12 @@ declare const _emwasmCtx: _IEmWasmCtx;
  * (bytes, module or instance; as promises for async mode).
  * If the compilation step was skipped in between, `EmWasm` will throw an error.
  */
-export function EmWasm<T extends IWasmDefinitionSyncBytes>(def: T): WasmBytes<T>;
-export function EmWasm<T extends IWasmDefinitionAsyncBytes>(def: T): Promise<WasmBytes<T>>;
-export function EmWasm<T extends IWasmDefinitionSyncModule>(def: T): WasmModule<T>;
-export function EmWasm<T extends IWasmDefinitionAsyncModule>(def: T): Promise<WasmModule<T>>;
-export function EmWasm<T extends IWasmDefinitionSyncInstance>(def: T): WasmInstance<T>;
-export function EmWasm<T extends IWasmDefinitionAsyncInstance>(def: T): Promise<WasmInstance<T>>;
+export function EmWasm<T extends IWasmDefinitionSyncBytes>(def: T): IWasmBytes<T>;
+export function EmWasm<T extends IWasmDefinitionAsyncBytes>(def: T): Promise<IWasmBytes<T>>;
+export function EmWasm<T extends IWasmDefinitionSyncModule>(def: T): IWasmModule<T>;
+export function EmWasm<T extends IWasmDefinitionAsyncModule>(def: T): Promise<IWasmModule<T>>;
+export function EmWasm<T extends IWasmDefinitionSyncInstance>(def: T): IWasmInstance<T>;
+export function EmWasm<T extends IWasmDefinitionAsyncInstance>(def: T): Promise<IWasmInstance<T>>;
 export function EmWasm<T extends IWasmDefinition>(def: T): any {
   if ((def as any).d) {
     // default compiled call: wasm loading during runtime
@@ -196,12 +349,12 @@ export function EmWasm<T extends IWasmDefinition>(def: T): any {
       return W.compileStreaming(_res(d));
     }
     if (s)
-      return new W.Instance(new W.Module(_dec(d)), _env(e)) as WasmInstance<T>;
+      return new W.Instance(new W.Module(_dec(d)), _env(e)) as IWasmInstance<T>;
     if (typeof W.instantiateStreaming === 'undefined')
       return W.instantiate(_dec(d), _env(e))
-        .then(inst => inst.instance as WasmInstance<T>);
+        .then(inst => inst.instance as IWasmInstance<T>);
     return W.instantiateStreaming(_res(d), _env(e))
-      .then(inst => inst.instance as WasmInstance<T>);
+      .then(inst => inst.instance as IWasmInstance<T>);
   }
   // invalid call: uncompiled normal run throws
   if (typeof _emwasmCtx === 'undefined') throw new Error('must run "emwasm"');
