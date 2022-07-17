@@ -3,10 +3,16 @@
 /node_modules/
 /.vscode
 
-# wasm artifacts
-/wasm/*.wasm
-/wasm/settings.json
-/src/wasm.ts
-/emsdk
-/emwasm-builds
+# to be removed
 /zig
+
+/inwasm/node_modules/
+/inwasm/lib
+/inwasm/dist
+/inwasm/emsdk
+
+/testproject/node_modules/
+/testproject/lib
+/testproject/dist
+/testproject/inwasm-builds
+/testproject/wasm/*.wasm

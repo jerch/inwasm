@@ -1,4 +1,4 @@
-import { EmWasm, ExtractDefinition, OutputMode, OutputType, IWasmModule, IWasmInstance, WebAssemblyExtended } from './emwasm/definitions';
+import { InWasm, ExtractDefinition, OutputMode, OutputType, IWasmModule, IWasmInstance, WebAssemblyExtended } from 'inwasm';
 
 
 const SETTINGS = {
@@ -8,7 +8,7 @@ const SETTINGS = {
 
 const convert = (() => {
   try {
-    return EmWasm({
+    return InWasm({
       name: 'convert-simd',
       type: OutputType.INSTANCE,
       mode: OutputMode.SYNC,
@@ -52,7 +52,7 @@ const convert = (() => {
   `
     })();
   } catch (e) {
-    return EmWasm({
+    return InWasm({
       name: 'convert',
       type: OutputType.INSTANCE,
       mode: OutputMode.SYNC,
@@ -119,7 +119,7 @@ console.log(
 const env = { jsadd: (a: number, b: number) => a + b }
 
 
-const second_ = EmWasm({
+const second_ = InWasm({
   name: 'second',
   type: OutputType.BYTES,
   mode: OutputMode.SYNC,
@@ -145,7 +145,7 @@ export const second = second_();
 
 
 // zig
-const fibonacci_zig_ = EmWasm({
+const fibonacci_zig_ = InWasm({
   name: 'fibonacci',
   type: OutputType.INSTANCE,
   mode: OutputMode.SYNC,
@@ -166,7 +166,7 @@ console.log(fibonacci_zig.exports.fibonacci(20));
 
 
 // srctype: wat
-const from_wat_ = EmWasm({
+const from_wat_ = InWasm({
   name: 'from_wat',
   type: OutputType.INSTANCE,
   mode: OutputMode.SYNC,
@@ -192,7 +192,7 @@ const from_wat = from_wat_();
 console.log(from_wat.exports.add(23, 42));
 
 // totally custom
-const custom = EmWasm({
+const custom = InWasm({
   name: 'custom',
   type: OutputType.INSTANCE,
   mode: OutputMode.SYNC,
@@ -214,7 +214,7 @@ console.log(custom.exports);
 
 
 // rust
-const rust = EmWasm({
+const rust = InWasm({
   name: 'doubled',
   type: OutputType.INSTANCE,
   mode: OutputMode.SYNC,
@@ -312,7 +312,7 @@ const yy = WAE.instantiateStreaming(fetch('asd')).then(r => r.instance);
 
 // scalar vs. simd convert
 const CONVERT_BYTES = {
-  SIMD: EmWasm({
+  SIMD: InWasm({
   name: 'convert-simd2',
   type: OutputType.BYTES,
   mode: OutputMode.SYNC,
@@ -355,7 +355,7 @@ return dst - TARGET;
 }
 `
 })(),
-scalar : EmWasm({
+scalar : InWasm({
   name: 'convert2',
   type: OutputType.BYTES,
   mode: OutputMode.SYNC,

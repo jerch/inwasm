@@ -3,7 +3,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { execSync } from 'child_process';
-import { IWasmDefinition, _IEmWasmCtx } from './definitions';
+import { IWasmDefinition, _IWasmCtx } from './definitions';
 import { run as emscripten_run, getSdkPath } from './emscripten';
 
 import * as chokidar from 'chokidar';
@@ -11,7 +11,10 @@ import * as chokidar from 'chokidar';
 import * as acorn from 'acorn';
 import * as walk from 'acorn-walk';
 
-import { green } from "colorette"
+import { green } from 'colorette';
+
+
+const BASE_PATH = path.dirname(__dirname);
 
 
 interface IWasmSourceDefinition {
@@ -31,7 +34,7 @@ interface IStackFrameInfo {
 type CompilerRunner = (def: IWasmDefinition, buildDir: string) => Buffer | Uint8Array;
 
 
-class EmWasmReadExit extends Error { }
+class InWasmReadExit extends Error { }
 
 
 /**
@@ -122,7 +125,7 @@ const COMPILER_RUNNERS: {[key: string]: CompilerRunner} = {
     const call = `${zig} build-lib ${src} -target wasm32-freestanding -dynamic -O ReleaseFast ${ff}`;
     console.log(call);
     execSync(call, { shell: '/bin/bash', stdio: 'inherit' });
-    const wasm_strip = path.join(wd, 'node_modules/wabt/bin/wasm-strip');
+    const wasm_strip = path.join(BASE_PATH, 'node_modules/wabt/bin/wasm-strip');
     execSync(`${wasm_strip} ${target}`, { shell: '/bin/bash', stdio: 'inherit' });
     return fs.readFileSync(target);
   },
@@ -132,8 +135,8 @@ const COMPILER_RUNNERS: {[key: string]: CompilerRunner} = {
     const src = `${def.name}.wat`;
     const target = `${def.name}.wasm`;
     fs.writeFileSync(src, def.code);
-    const wat2wasm = path.join(wd, 'node_modules/wabt/bin/wat2wasm');
-    const wasm_strip = path.join(wd, 'node_modules/wabt/bin/wasm-strip');
+    const wat2wasm = path.join(BASE_PATH, 'node_modules/wabt/bin/wat2wasm');
+    const wasm_strip = path.join(BASE_PATH, 'node_modules/wabt/bin/wasm-strip');
     const call = `${wat2wasm} ${src} && ${wasm_strip} ${target}`;
     console.log(call);
     execSync(call, { shell: '/bin/bash', stdio: 'inherit' });
@@ -157,7 +160,7 @@ const COMPILER_RUNNERS: {[key: string]: CompilerRunner} = {
     fs.writeFileSync(src, def.code);
     fs.appendFileSync('Cargo.toml', '\n[lib]\ncrate-type = ["cdylib"]\n[profile.release]\nlto = true\n');
     execSync(`cargo build --target wasm32-unknown-unknown --release`, { shell: '/bin/bash', stdio: 'inherit' });
-    const wasm_strip = path.join(wd, 'node_modules/wabt/bin/wasm-strip');
+    const wasm_strip = path.join(BASE_PATH, 'node_modules/wabt/bin/wasm-strip');
     execSync(`${wasm_strip} ${target}`, { shell: '/bin/bash', stdio: 'inherit' });
     return fs.readFileSync(target);
   }
@@ -169,22 +172,22 @@ let UNITS: IWasmSourceDefinition[] = [];
 
 
 // inject global compile ctx object
-(global as any)._emwasmCtx = {
+(global as any)._wasmCtx = {
   add: (definition) => {
     if (!definition.name) return;
     try {
-      throw new EmWasmReadExit('exit');
+      throw new InWasmReadExit('exit');
     } catch (e) {
-      if (e instanceof EmWasmReadExit)
+      if (e instanceof InWasmReadExit)
         UNITS.push({definition, stack: e.stack || ''});
       throw e;
     }
   }
-} as _IEmWasmCtx;
+} as _IWasmCtx;
 
 
 /**
- * Parse callstack from EmWasmReadExit errors.
+ * Parse callstack from InWasmReadExit errors.
  */
 function parseCallStack(callstack: string): IStackFrameInfo[] {
   const stack = callstack.split('\n');
@@ -207,22 +210,22 @@ function parseCallStack(callstack: string): IStackFrameInfo[] {
 
 
 /**
- * Find first stack frame in `filename` following an `EmWasm` call.
- * This assumes, that every error location has a distinct `EmWasm` call
+ * Find first stack frame in `filename` following an `InWasm` call.
+ * This assumes, that every error location has a distinct `InWasm` call
  * and has no further indirection.
  */
 function getStackFrame(callstack: IStackFrameInfo[], filename: string): IStackFrameInfo {
   for (let i = 0; i < callstack.length; ++i) {
     if (callstack[i].unit.indexOf(filename) !== -1) {
-      if (callstack[i - 1] && callstack[i - 1].at === 'EmWasm') return callstack[i];
+      if (callstack[i - 1] && callstack[i - 1].at === 'InWasm') return callstack[i];
     }
   }
-  throw new Error('error finding distinct EmWasm call from callstack');
+  throw new Error('error finding distinct InWasm call from callstack');
 }
 
 
 /**
- * Returns argument node of `EmWasm({...})` call from matching stack frame.
+ * Returns argument node of `InWasm({...})` call from matching stack frame.
  *
  * Search/narrowing happens by these steps:
  * - find closest single CallExpression node at stack frame position, otherwise throw
@@ -247,14 +250,14 @@ function identifyDefinitionBlock(stackFrame: IStackFrameInfo, content: string): 
     }
   });
   // expected: exactly at least one CallExpression with exactly one argument of type ObjectExpression
-  if (!calls.length) throw new Error('malformed source: no EmWasm CallExpression found');
+  if (!calls.length) throw new Error('malformed source: no InWasm CallExpression found');
   let idx = 0;
   if (calls.length !== 1) {
     // find the innermost (highest start), sanity check for lowest end
     for (let i = 1; i < calls.length; ++i)
       if (calls[idx].start < calls[i].start) idx = i;
     if (calls[idx].end > Math.min(...calls.map(el => el.end)))
-      throw new Error('malformed source: could not determine EmWasm CallExpression');
+      throw new Error('malformed source: could not determine InWasm CallExpression');
   }
   // innermost call is expected to get wasm definition as {...} literal
   const args = (calls[idx] as any).arguments;
@@ -282,7 +285,7 @@ function formatBytes(bytes: number, decimals: number = 2): string {
 function compileWasm(def: IWasmDefinition, filename: string): Buffer {
   // FIXME: ensure we are at project root path
   // create build folders
-  const baseDir = path.resolve('./emwasm-builds');
+  const baseDir = path.resolve('./inwasm-builds');
   if (!fs.existsSync(baseDir)) fs.mkdirSync(baseDir);
   const buildDir = path.join(baseDir, filename, def.name);
   if (!fs.existsSync(buildDir)) fs.mkdirSync(buildDir, {recursive: true});
@@ -298,10 +301,10 @@ function compileWasm(def: IWasmDefinition, filename: string): Buffer {
   // generate final.wasm and final.wat file in build folder
   const target = path.join(buildDir, 'final');
   fs.writeFileSync(target + '.wasm', result);
-  const wasm2wat = path.join(wd, 'node_modules/wabt/bin/wasm2wat');
+  const wasm2wat = path.join(BASE_PATH, 'node_modules/wabt/bin/wasm2wat');
   const call = `${wasm2wat} ${target + '.wasm'} -o ${target + '.wat'}`;
   execSync(call, { shell: '/bin/bash', stdio: 'inherit' });
-  console.log(green('[emwasm compile]'), `Successfully built '${def.name}' (${formatBytes(result.length)}).\n`);
+  console.log(green('[inwasm compile]'), `Successfully built '${def.name}' (${formatBytes(result.length)}).\n`);
   return result;
 }
 
@@ -329,7 +332,7 @@ function loadModule(filename: string) {
     delete require.cache[require.resolve(modulePath)];
     require(modulePath);
   } catch (e) {
-    if (!(e instanceof EmWasmReadExit)) {
+    if (!(e instanceof InWasmReadExit)) {
       console.log('error during module require:', e);
       return;
     }
@@ -345,7 +348,7 @@ async function loadModuleES6(filename: string) {
   const modulePath = path.resolve(filename);
   const randStr = Math.random().toString(36).replace(/[^a-z]+/g, '').slice(0, 5);
   await import(modulePath + `?bogus=${randStr}`).catch(e => {
-    if (!(e instanceof EmWasmReadExit)) {
+    if (!(e instanceof InWasmReadExit)) {
       console.log('error during module import:', e);
       return;
     }
@@ -358,11 +361,11 @@ async function loadModuleES6(filename: string) {
  */
 async function processFile(filename: string) {
   let lastStackFrame: IStackFrameInfo = { at: '', unit: '', line: -1, column: -1 };
-  // read file content, exit early if no EmWasm was found at all
+  // read file content, exit early if no InWasm was found at all
   let content = fs.readFileSync(filename, { encoding: 'utf-8' });
-  if (content.indexOf('EmWasm') === -1) return;
+  if (content.indexOf('InWasm') === -1) return;
 
-  // loop until all EmWasmReadExit errors are resolved
+  // loop until all InWasmReadExit errors are resolved
   while (true) {
     // load module - may fill UNITS with next discovered definitions
     UNITS.length = 0;
@@ -370,7 +373,7 @@ async function processFile(filename: string) {
     loadModule(filename);
     //await loadModuleES6(filename);
 
-    // done if the module does not throw EmWasmReadExit anymore
+    // done if the module does not throw InWasmReadExit anymore
     if (!UNITS.length) break;
 
     const final: string[] = [];
@@ -380,7 +383,7 @@ async function processFile(filename: string) {
       // get stack position, error if we dont make any progress
       const stackFrame = getStackFrame(parseCallStack(wdef.stack), filename);
       if (lastStackFrame.line === stackFrame.line && lastStackFrame.column === stackFrame.column) {
-        throw new Error(`unable to parse/compile EmWasm call at ${filename}:${stackFrame.line}:${stackFrame.column}`);
+        throw new Error(`unable to parse/compile InWasm call at ${filename}:${stackFrame.line}:${stackFrame.column}`);
       }
       lastStackFrame = stackFrame;
 
@@ -438,7 +441,7 @@ async function main() {
     return runWatcher(args);
   }
   if (!args.length) {
-    return console.log(`usage: emwasm [-w] files|glob`);
+    return console.log(`usage: inwasm [-w] files|glob`);
   }
   for (const filename of args) {
     await processFile(filename);

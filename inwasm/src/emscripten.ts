@@ -7,11 +7,19 @@ const PATH_ENV_NAME = 'EMWASM_EMSDK';
 const PATH_ENV_VERSION = 'EMWASM_EMSDK_VERSION';
 
 
+const BASE_PATH = path.dirname(__dirname);
+
+
 export function getSdkPath(): string {
+  // FIXME: should support proper path indirection:
+  // - 1st from config?
+  // - 2nd from project folder
+  // . 3rd from inwasm folder (also fallback)
   return process.env[PATH_ENV_NAME]
     ? path.resolve(process.env[PATH_ENV_NAME])
-    : path.resolve(path.join(path.dirname(path.dirname(__dirname)), 'emsdk'));
+    : path.resolve(BASE_PATH, 'emsdk');
 }
+
 
 function getDefaultVersion(): string {
   // TODO: config file?
@@ -35,9 +43,12 @@ export function checkout(): void {
     throw new Error(`checkout: SDK path '${sdkPath}' does not contain a valid EMSDK installation`);
   }
   const parentPath = path.dirname(sdkPath);
+  const wd = process.cwd();
+  process.chdir(parentPath);
   const cmd = `git clone https://github.com/emscripten-core/emsdk.git ${path.basename(sdkPath)}`;
   console.log(`\n[sdk.checkout] ${cmd}`);
   cp.execSync(cmd, {shell: '/bin/bash', stdio: 'inherit'});
+  process.chdir(wd);
 }
 
 // update emsdk

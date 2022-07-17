@@ -1,5 +1,5 @@
 /**
- * Output type of `EmWasm`.
+ * Output type of `InWasm`.
  * Determines whether to return bytes, a wasm module or a wasm instance.
  * Returns for async corresponding promises.
  */
@@ -11,7 +11,7 @@ export const enum OutputType {
 
 
 /**
- * Whether `EmWasm` returns the requested type sync or async (promise).
+ * Whether `InWasm` returns the requested type sync or async (promise).
  * Note that synchronous processing of wasm modules/instances is highly restricted
  * in browsers' main JS context (works only reliable in nodejs or a web worker).
  */
@@ -262,8 +262,8 @@ export declare namespace WebAssemblyExtended {
 }
 
 
-// tiny compile ctx for emwasm
-export interface _IEmWasmCtx {
+// tiny compile ctx for inwasm
+export interface _IWasmCtx {
   // adds definition for compile evaluation and raises
   add(def: IWasmDefinition): void;
 }
@@ -283,23 +283,23 @@ function _env(env: any): { env: any } | undefined {
 }
 
 
-// compiler ctx helper (only defined during compile run from emwasm)
-declare const _emwasmCtx: _IEmWasmCtx;
+// compiler ctx helper (only defined during compile run from inwasm)
+declare const _wasmCtx: _IWasmCtx;
 
 
 /**
- * Embed wasm inline from a source definition.
+ * Inline wasm from a source definition.
  *
  * coding stage\
- * Place a `EmWasm` call with a valid wasm source definition (see `IWasmDefinition`)
+ * Place a `InWasm` call with a valid wasm source definition (see `IWasmDefinition`)
  * in a TS source file.
  *
- * `EmWasm` with its source definition has a few additional coding restrictions:
+ * `InWasm` with its source definition has a few additional coding restrictions:
  *   - The source module should not have complicated imports (close to leaves in dependency tree,
- *     no cycling) and should import `EmWasm` directly.
+ *     no cycling) and should import `InWasm` directly.
  *   - The wasm definition must be coded inline as literal object on distinct
- *     `EmWasm` calls, eg. `EmWasm({...})`.
- *   - All `EmWasm` calls must execute on import of the module (e.g. defined at top level),
+ *     `InWasm` calls, eg. `InWasm({...})`.
+ *   - All `InWasm` calls must execute on import of the module (e.g. defined at top level),
  *     as the compiler script relies on partial import execution.
  *   - Importing the module should be side-effect free, eg. not contain other complicated
  *     state altering constructs at top level.
@@ -308,25 +308,25 @@ declare const _emwasmCtx: _IEmWasmCtx;
  *     cannot be altered later on anymore.
  *
  * compile stage\
- * After TS compilation run `emwasm` on files containing `EmWasm` calls.
- * `emwasm` grabs the source definitions from partial execution, compiles them into
+ * After TS compilation run `inwasm` on files containing `InWasm` calls.
+ * `inwasm` grabs the source definitions from partial execution, compiles them into
  * wasm binaries and replaces the source definitions with base64 encoded runtime definitions.
  * Note that this currently happens inplace, thus the original file content gets overwritten.
- * Alternatively run `emwasm` in watch mode with `emwasm -w glob*pattern`.
- * Note: `emwasm` does not yet work with ES6 modules.
+ * Alternatively run `inwasm` in watch mode with `inwasm -w glob*pattern`.
+ * Note: `inwasm` does not yet work with ES6 modules.
  *
  * runtime stage\
- * At runtime `EmWasm` decodes the base64 wasm data and returns a function returning the
+ * At runtime `InWasm` decodes the base64 wasm data and returns a function returning the
  * requested output type (bytes, module or instance; as promises for async mode).
- * If the compilation step was skipped in between, `EmWasm` will throw an error.
+ * If the compilation step was skipped in between, `InWasm` will throw an error.
  */
-export function EmWasm<T extends IWasmDefinitionSyncBytes>(def: T): () => IWasmBytes<T>;
-export function EmWasm<T extends IWasmDefinitionAsyncBytes>(def: T): () => Promise<IWasmBytes<T>>;
-export function EmWasm<T extends IWasmDefinitionSyncModule>(def: T): () => IWasmModule<T>;
-export function EmWasm<T extends IWasmDefinitionAsyncModule>(def: T): () => Promise<IWasmModule<T>>;
-export function EmWasm<T extends IWasmDefinitionSyncInstance>(def: T): () => IWasmInstance<T>;
-export function EmWasm<T extends IWasmDefinitionAsyncInstance>(def: T): () => Promise<IWasmInstance<T>>;
-export function EmWasm<T extends IWasmDefinition>(def: T): any {
+export function InWasm<T extends IWasmDefinitionSyncBytes>(def: T): () => IWasmBytes<T>;
+export function InWasm<T extends IWasmDefinitionAsyncBytes>(def: T): () => Promise<IWasmBytes<T>>;
+export function InWasm<T extends IWasmDefinitionSyncModule>(def: T): () => IWasmModule<T>;
+export function InWasm<T extends IWasmDefinitionAsyncModule>(def: T): () => Promise<IWasmModule<T>>;
+export function InWasm<T extends IWasmDefinitionSyncInstance>(def: T): () => IWasmInstance<T>;
+export function InWasm<T extends IWasmDefinitionAsyncInstance>(def: T): () => Promise<IWasmInstance<T>>;
+export function InWasm<T extends IWasmDefinition>(def: T): any {
   if ((def as any).d) {
     // default compiled call: wasm loading during runtime
     // for the sake of small bundling size (<900 bytes) the code is somewhat degenerated
@@ -357,6 +357,6 @@ export function EmWasm<T extends IWasmDefinition>(def: T): any {
       : W.instantiate(bytes || (bytes = _dec(d)), _env(e)).then(r => (mod = r.module) && r.instance as IWasmInstance<T>);
   }
   // invalid call: uncompiled normal run throws
-  if (typeof _emwasmCtx === 'undefined') throw new Error('must run "emwasm"');
-  _emwasmCtx.add(def);
+  if (typeof _wasmCtx === 'undefined') throw new Error('must run "inwasm"');
+  _wasmCtx.add(def);
 }
