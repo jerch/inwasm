@@ -262,8 +262,6 @@ export declare namespace WebAssemblyExtended {
 }
 
 
-// FIXME: apply custom types below
-
 // tiny compile ctx for emwasm
 export interface _IEmWasmCtx {
   // adds definition for compile evaluation and raises
@@ -282,10 +280,6 @@ function _dec(s: string): Uint8Array {
 // runtime helper - set imports conditionally
 function _env(env: any): { env: any } | undefined {
   return env ? { env: env } : undefined
-}
-// runtime helper - create response object
-function _res(d: string): Response {
-  return new Response(_dec(d), { status: 200, headers: { 'Content-Type': 'application/wasm' } })
 }
 
 
@@ -322,16 +316,16 @@ declare const _emwasmCtx: _IEmWasmCtx;
  * Note: `emwasm` does not yet work with ES6 modules.
  *
  * runtime stage\
- * At runtime `EmWasm` decodes the base64 wasm data and returns the requested output type
- * (bytes, module or instance; as promises for async mode).
+ * At runtime `EmWasm` decodes the base64 wasm data and returns a function returning the
+ * requested output type (bytes, module or instance; as promises for async mode).
  * If the compilation step was skipped in between, `EmWasm` will throw an error.
  */
-export function EmWasm<T extends IWasmDefinitionSyncBytes>(def: T): IWasmBytes<T>;
-export function EmWasm<T extends IWasmDefinitionAsyncBytes>(def: T): Promise<IWasmBytes<T>>;
-export function EmWasm<T extends IWasmDefinitionSyncModule>(def: T): IWasmModule<T>;
-export function EmWasm<T extends IWasmDefinitionAsyncModule>(def: T): Promise<IWasmModule<T>>;
-export function EmWasm<T extends IWasmDefinitionSyncInstance>(def: T): IWasmInstance<T>;
-export function EmWasm<T extends IWasmDefinitionAsyncInstance>(def: T): Promise<IWasmInstance<T>>;
+export function EmWasm<T extends IWasmDefinitionSyncBytes>(def: T): () => IWasmBytes<T>;
+export function EmWasm<T extends IWasmDefinitionAsyncBytes>(def: T): () => Promise<IWasmBytes<T>>;
+export function EmWasm<T extends IWasmDefinitionSyncModule>(def: T): () => IWasmModule<T>;
+export function EmWasm<T extends IWasmDefinitionAsyncModule>(def: T): () => Promise<IWasmModule<T>>;
+export function EmWasm<T extends IWasmDefinitionSyncInstance>(def: T): () => IWasmInstance<T>;
+export function EmWasm<T extends IWasmDefinitionAsyncInstance>(def: T): () => Promise<IWasmInstance<T>>;
 export function EmWasm<T extends IWasmDefinition>(def: T): any {
   if ((def as any).d) {
     // default compiled call: wasm loading during runtime
@@ -339,22 +333,22 @@ export function EmWasm<T extends IWasmDefinition>(def: T): any {
     // see cli.ts for the meaning of the {t, s, d, e} object properties
     const { t, s, d, e } = def as any;
     const W = WebAssembly;
+    const bytes = _dec(d);
     if (t === OutputType.BYTES) {
-      if (s) return _dec(d);
-      return Promise.resolve(_dec(d));
+      if (s) return () => bytes;
+      return () => Promise.resolve(bytes);
     }
     if (t === OutputType.MODULE) {
-      if (s) return new W.Module(_dec(d));
-      if (typeof W.compileStreaming === 'undefined') return W.compile(_dec(d));
-      return W.compileStreaming(_res(d));
+      if (s) return () => new W.Module(bytes);
+      return () => W.compile(bytes);
     }
+    // FIXME: API considerations - get import from func arguments here?
+    // this has multiple benefits:
+    // - we can attach&eval import types in definition as normal object (fixes memory export glitch)
+    // - imports can be altered late before using the instance (no need to provide at compile time)
     if (s)
-      return new W.Instance(new W.Module(_dec(d)), _env(e)) as IWasmInstance<T>;
-    if (typeof W.instantiateStreaming === 'undefined')
-      return W.instantiate(_dec(d), _env(e))
-        .then(inst => inst.instance as IWasmInstance<T>);
-    return W.instantiateStreaming(_res(d), _env(e))
-      .then(inst => inst.instance as IWasmInstance<T>);
+      return () => new W.Instance(new W.Module(bytes), _env(e)) as IWasmInstance<T>;
+    return () => W.instantiate(bytes, _env(e)).then(r => r.instance as IWasmInstance<T>);
   }
   // invalid call: uncompiled normal run throws
   if (typeof _emwasmCtx === 'undefined') throw new Error('must run "emwasm"');

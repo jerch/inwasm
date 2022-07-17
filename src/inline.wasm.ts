@@ -1,4 +1,6 @@
-import { EmWasm, ExtractDefinition, OutputMode, OutputType, IWasmModule, IWasmInstance, WebAssemblyExtended, IWasmResponse } from './emwasm/definitions';
+import { EmWasm, ExtractDefinition, OutputMode, OutputType, IWasmModule, IWasmInstance, WebAssemblyExtended } from './emwasm/definitions';
+
+const start = Date.now();
 
 const SETTINGS = {
   chunkSize: 16384
@@ -49,7 +51,7 @@ const convert = (() => {
     return dst - TARGET;
   }
   `
-    });
+    })();
   } catch (e) {
     return EmWasm({
       name: 'convert',
@@ -82,7 +84,7 @@ const convert = (() => {
       return dst - TARGET;
     }
     `
-    })
+    })()
   }
 })();
 
@@ -118,7 +120,7 @@ console.log(
 const env = { jsadd: (a: number, b: number) => a + b }
 
 
-export const second = EmWasm({
+const second_ = EmWasm({
   name: 'second',
   type: OutputType.BYTES,
   mode: OutputMode.SYNC,
@@ -140,10 +142,11 @@ export const second = EmWasm({
     }
     `
 });
+export const second = second_();
 
 
 // zig
-const fibonacci_zig = EmWasm({
+const fibonacci_zig_ = EmWasm({
   name: 'fibonacci',
   type: OutputType.INSTANCE,
   mode: OutputMode.SYNC,
@@ -158,12 +161,13 @@ const fibonacci_zig = EmWasm({
   }
   `
 });
+const fibonacci_zig = fibonacci_zig_();
 console.log(fibonacci_zig.exports.fibonacci(5));
 console.log(fibonacci_zig.exports.fibonacci(20));
 
 
 // srctype: wat
-const from_wat = EmWasm({
+const from_wat_ = EmWasm({
   name: 'from_wat',
   type: OutputType.INSTANCE,
   mode: OutputMode.SYNC,
@@ -185,6 +189,7 @@ const from_wat = EmWasm({
     (export "add" (func $add)))
     `
 });
+const from_wat = from_wat_();
 console.log(from_wat.exports.add(23, 42));
 
 // totally custom
@@ -205,7 +210,7 @@ const custom = EmWasm({
     convert: (length: number) => 0
   },
   code: ''
-});
+})();
 console.log(custom.exports);
 
 
@@ -224,7 +229,7 @@ const rust = EmWasm({
     x * 2
   }
   `
-});
+})();
 console.log(rust.exports.doubled(66));
 console.log(rust.exports.doubled(-333));
 
@@ -303,3 +308,102 @@ const xx = WAE.compileStreaming(uu);
 const zz = WAE.instantiateStreaming(fetch('bla') as Promise<WasmResponse<secondDefinition>>).then(r => r.instance);
 const yy = WAE.instantiateStreaming(fetch('asd')).then(r => r.instance);
 */
+
+
+
+// scalar vs. simd convert
+const CONVERT_BYTES = {
+  SIMD: EmWasm({
+  name: 'convert-simd2',
+  type: OutputType.BYTES,
+  mode: OutputMode.SYNC,
+  srctype: 'C',
+  compile: {
+    defines: { CHUNK_SIZE: SETTINGS.chunkSize },
+    switches: ['-msimd128', '-msse', '-msse2', '-mssse3', '-msse4.1']
+  },
+  exports: {
+    chunk_addr: () => 0,
+    target_addr: () => 0,
+    convert: (length: number) => 0
+  },
+  code: `
+static unsigned char CHUNK[CHUNK_SIZE] __attribute__((aligned(16)));
+static unsigned char TARGET[CHUNK_SIZE/2] __attribute__((aligned(16)));
+
+void* chunk_addr() { return &CHUNK[0]; }
+void* target_addr() { return &TARGET[0]; }
+int convert(int length);
+
+#include <immintrin.h>
+int convert(int length) {
+unsigned char *src = CHUNK;
+unsigned char *dst = TARGET;
+int len = length / 32;
+while(len--) {
+  // 2x shift variant (faster than shuffle on wasm simd)
+  __m128i v0 = _mm_loadu_si128((__m128i*) src);
+  __m128i v1 = _mm_loadu_si128((__m128i*) (src + 16));
+  v0 = _mm_srli_epi16(v0, 8);
+  v1 = _mm_srli_epi16(v1, 8);
+  __m128i pack = _mm_packus_epi16(v0, v1);
+  _mm_storeu_si128((__m128i*) dst, pack);
+  dst += 16;
+  src += 32;
+}
+// FIXME: implement tail handling
+return dst - TARGET;
+}
+`
+})(),
+scalar : EmWasm({
+  name: 'convert2',
+  type: OutputType.BYTES,
+  mode: OutputMode.SYNC,
+  srctype: 'C',
+  compile: {
+    defines: { CHUNK_SIZE: SETTINGS.chunkSize }
+  },
+  exports: {
+    chunk_addr: () => 0,
+    target_addr: () => 0,
+    convert: (length: number) => 0
+  },
+  code: `
+static unsigned char CHUNK[CHUNK_SIZE] __attribute__((aligned(16)));
+static unsigned char TARGET[CHUNK_SIZE/2] __attribute__((aligned(16)));
+
+void* chunk_addr() { return &CHUNK[0]; }
+void* target_addr() { return &TARGET[0]; }
+int convert(int length);
+
+int convert(int length) {
+  unsigned char *src = CHUNK + 1;
+  unsigned char *dst = TARGET;
+  int len = length / 2;
+  for (; len--; src += 2) {
+    *dst++ = *src;
+  }
+  return dst - TARGET;
+}
+`
+})()
+};
+
+
+// with extended WebAssembly types we can rewrite convert SIMD|SCALAR instantiation much nicer:
+const WAE = WebAssembly as typeof WebAssemblyExtended;
+
+// sync
+const m = WAE.validate(CONVERT_BYTES.SIMD)
+  ? new WAE.Module(CONVERT_BYTES.SIMD)
+  : new WAE.Module(CONVERT_BYTES.scalar);
+const i = new WAE.Instance(m);
+
+// async
+const mp = WAE.instantiate(
+  WAE.validate(CONVERT_BYTES.SIMD) ? CONVERT_BYTES.SIMD : CONVERT_BYTES.scalar
+);
+
+
+console.log('runtime', Date.now() - start);
