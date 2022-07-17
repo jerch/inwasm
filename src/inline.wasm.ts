@@ -1,6 +1,5 @@
 import { EmWasm, ExtractDefinition, OutputMode, OutputType, IWasmModule, IWasmInstance, WebAssemblyExtended } from './emwasm/definitions';
 
-const start = Date.now();
 
 const SETTINGS = {
   chunkSize: 16384
@@ -404,6 +403,3 @@ const i = new WAE.Instance(m);
 const mp = WAE.instantiate(
   WAE.validate(CONVERT_BYTES.SIMD) ? CONVERT_BYTES.SIMD : CONVERT_BYTES.scalar
 );
-
-
-console.log('runtime', Date.now() - start);

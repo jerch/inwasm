@@ -332,23 +332,29 @@ export function EmWasm<T extends IWasmDefinition>(def: T): any {
     // for the sake of small bundling size (<900 bytes) the code is somewhat degenerated
     // see cli.ts for the meaning of the {t, s, d, e} object properties
     const { t, s, d, e } = def as any;
+    // memorize bytes and module
+    let bytes: IWasmBytes<T>;
+    let mod: IWasmModule<T>;
     const W = WebAssembly;
-    const bytes = _dec(d);
     if (t === OutputType.BYTES) {
-      if (s) return () => bytes;
-      return () => Promise.resolve(bytes);
+      if (s) return () => bytes || (bytes = _dec(d));
+      return () => Promise.resolve(bytes || (bytes = _dec(d)));
     }
     if (t === OutputType.MODULE) {
-      if (s) return () => new W.Module(bytes);
-      return () => W.compile(bytes);
+      if (s) return () => mod || (mod = new W.Module(bytes || (bytes = _dec(d))));
+      return () => mod
+        ? Promise.resolve(mod)
+        : W.compile(bytes || (bytes = _dec(d))).then(m => mod = m as IWasmModule<T>);
     }
     // FIXME: API considerations - get import from func arguments here?
     // this has multiple benefits:
     // - we can attach&eval import types in definition as normal object (fixes memory export glitch)
     // - imports can be altered late before using the instance (no need to provide at compile time)
     if (s)
-      return () => new W.Instance(new W.Module(bytes), _env(e)) as IWasmInstance<T>;
-    return () => W.instantiate(bytes, _env(e)).then(r => r.instance as IWasmInstance<T>);
+      return () => new W.Instance(mod || (mod = new W.Module(bytes || (bytes = _dec(d)))), _env(e)) as IWasmInstance<T>;
+    return () => mod
+      ? W.instantiate(mod, _env(e)) as Promise<IWasmInstance<T>>
+      : W.instantiate(bytes || (bytes = _dec(d)), _env(e)).then(r => (mod = r.module) && r.instance as IWasmInstance<T>);
   }
   // invalid call: uncompiled normal run throws
   if (typeof _emwasmCtx === 'undefined') throw new Error('must run "emwasm"');
