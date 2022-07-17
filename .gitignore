@@ -16,3 +16,4 @@
 /testproject/dist
 /testproject/inwasm-builds
 /testproject/wasm/*.wasm
+/testproject/emsdk
