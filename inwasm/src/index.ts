@@ -84,11 +84,11 @@ export interface IWasmDefinitionAsyncInstance extends IWasmDefinitionAsync {
 export interface IWasmBytes<T extends IWasmDefinition> extends Uint8Array { }
 
 // dummy type to carry forward definition type info on MODULE
-export interface IWasmModule<T extends IWasmDefinition> extends WebAssembly.Module { }
+export interface IWasmModule<T extends IWasmDefinition> extends WebAssemblyExtended.Module { }
 
 // extends WebAssembly.Instance with proper exports typings
 // FIXME: needs better memory story (not always exported)
-export interface IWasmInstance<T extends IWasmDefinition> extends WebAssembly.Instance {
+export interface IWasmInstance<T extends IWasmDefinition> extends WebAssemblyExtended.Instance {
   exports: { memory: WebAssembly.Memory } & T['exports'];
 }
 

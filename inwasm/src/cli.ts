@@ -3,7 +3,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { execSync } from 'child_process';
-import { IWasmDefinition, _IWasmCtx } from './definitions';
+import { IWasmDefinition, _IWasmCtx } from '.';
 import { run as emscripten_run, getSdkPath } from './emscripten';
 
 import * as chokidar from 'chokidar';

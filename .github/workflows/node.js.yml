@@ -30,6 +30,7 @@ jobs:
       with:
         node-version: ${{ matrix.node-version }}
     - run: rustup target add wasm32-unknown-unknown
-    - run: cd inwasm && npm i
-    - run: cd testproject && npm i
-
+    - run: cd inwasm && npm install
+    - name: inwasm type tests
+      run: cd inwasm && npm run test-types
+    - run: cd testproject && npm install
