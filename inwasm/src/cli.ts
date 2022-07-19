@@ -12,9 +12,15 @@ import * as acorn from 'acorn';
 import * as walk from 'acorn-walk';
 
 import { green } from 'colorette';
+import { APP_ROOT, PROJECT_ROOT, CONFIG } from './config';
+import { getZigBinary } from './zig';
 
 
-const BASE_PATH = path.dirname(__dirname);
+
+console.log(green('[inwasm config]'), 'used configration:');
+console.log('APP_ROOT:', APP_ROOT);
+console.log('PROJECT_ROOT:', PROJECT_ROOT);
+console.log(CONFIG);
 
 
 interface IWasmSourceDefinition {
@@ -114,18 +120,11 @@ const COMPILER_RUNNERS: {[key: string]: CompilerRunner} = {
       .filter(el => typeof el[1] === 'function' || el[1] instanceof WebAssembly.Global)
       .map(el => `--export=${el[0]}`)
       .join(' ');
-    // FIXME: better zig sdk handling...
-    let zig = '';
-    try {
-      execSync('zig version');
-      zig = 'zig';
-    } catch (e) {
-      zig = '~/Dokumente/github/wasm-dummy/zig/zig-linux-x86_64-0.10.0-dev.2978+803376708/zig';
-    }
+    const zig = getZigBinary();
     const call = `${zig} build-lib ${src} -target wasm32-freestanding -dynamic -O ReleaseFast ${ff}`;
     console.log(call);
     execSync(call, { shell: '/bin/bash', stdio: 'inherit' });
-    const wasm_strip = path.join(BASE_PATH, 'node_modules/wabt/bin/wasm-strip');
+    const wasm_strip = path.join(APP_ROOT, 'node_modules/wabt/bin/wasm-strip');
     execSync(`${wasm_strip} ${target}`, { shell: '/bin/bash', stdio: 'inherit' });
     return fs.readFileSync(target);
   },
@@ -135,8 +134,8 @@ const COMPILER_RUNNERS: {[key: string]: CompilerRunner} = {
     const src = `${def.name}.wat`;
     const target = `${def.name}.wasm`;
     fs.writeFileSync(src, def.code);
-    const wat2wasm = path.join(BASE_PATH, 'node_modules/wabt/bin/wat2wasm');
-    const wasm_strip = path.join(BASE_PATH, 'node_modules/wabt/bin/wasm-strip');
+    const wat2wasm = path.join(APP_ROOT, 'node_modules/wabt/bin/wat2wasm');
+    const wasm_strip = path.join(APP_ROOT, 'node_modules/wabt/bin/wasm-strip');
     const call = `${wat2wasm} ${src} && ${wasm_strip} ${target}`;
     console.log(call);
     execSync(call, { shell: '/bin/bash', stdio: 'inherit' });
@@ -160,7 +159,7 @@ const COMPILER_RUNNERS: {[key: string]: CompilerRunner} = {
     fs.writeFileSync(src, def.code);
     fs.appendFileSync('Cargo.toml', '\n[lib]\ncrate-type = ["cdylib"]\n[profile.release]\nlto = true\n');
     execSync(`cargo build --target wasm32-unknown-unknown --release`, { shell: '/bin/bash', stdio: 'inherit' });
-    const wasm_strip = path.join(BASE_PATH, 'node_modules/wabt/bin/wasm-strip');
+    const wasm_strip = path.join(APP_ROOT, 'node_modules/wabt/bin/wasm-strip');
     execSync(`${wasm_strip} ${target}`, { shell: '/bin/bash', stdio: 'inherit' });
     return fs.readFileSync(target);
   }
@@ -301,7 +300,7 @@ function compileWasm(def: IWasmDefinition, filename: string): Buffer {
   // generate final.wasm and final.wat file in build folder
   const target = path.join(buildDir, 'final');
   fs.writeFileSync(target + '.wasm', result);
-  const wasm2wat = path.join(BASE_PATH, 'node_modules/wabt/bin/wasm2wat');
+  const wasm2wat = path.join(APP_ROOT, 'node_modules/wabt/bin/wasm2wat');
   const call = `${wasm2wat} ${target + '.wasm'} -o ${target + '.wat'}`;
   execSync(call, { shell: '/bin/bash', stdio: 'inherit' });
   console.log(green('[inwasm compile]'), `Successfully built '${def.name}' (${formatBytes(result.length)}).\n`);
