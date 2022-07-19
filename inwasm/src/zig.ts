@@ -66,7 +66,7 @@ function downloadAndUnpack(basePath: string, version: IDownloadVersion, versionS
   const tarball = path.join(basePath, 'sdk.xz');
   console.log(`[zig.run] Installing Zig "${versionString}"...`);
   cp.execSync(`curl --progress-bar -o ${tarball} ${version.tarball}`, { shell: '/bin/bash', stdio: 'inherit' });
-  const shasum = cp.execSync(`sha256sum ${tarball}`, { encoding: 'utf-8' });
+  const shasum = cp.execSync(`shasum -a 256 ${tarball}`, { encoding: 'utf-8' });
   if (!shasum.includes(version.shasum)) throw new Error('download error - shasum does not match');
   cp.execSync(`tar -xf ${tarball} -C ${basePath}`);
   fs.unlinkSync(tarball);
