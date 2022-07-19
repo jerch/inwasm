@@ -105,7 +105,7 @@ export function getZigBinary(): string {
     }
     console.log(`[zig.run] Resolving version change "${installed}" --> "${zigConf.version}"`);
   }
-  fs.rmdirSync(basePath, { recursive: true });
+  rmFolder(basePath);
 
   // install
   fs.mkdirSync(basePath, { recursive: true });
@@ -114,4 +114,16 @@ export function getZigBinary(): string {
     return path.join(basePath, 'zig');
   }
   throw new Error('cannot find zig binary');
+}
+
+
+// TODO: move into helper module (also needed by cli.ts)
+function rmFolder(p: string) {
+  try {
+    fs.rmdirSync(p, { recursive: true });
+  } catch (e) {
+    try {
+      fs.rmSync(p, { recursive: true });
+    } catch (e) {}
+  }
 }
