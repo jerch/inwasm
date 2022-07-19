@@ -2,6 +2,7 @@ import { APP_ROOT, PROJECT_ROOT, CONFIG } from './config';
 import * as cp from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
+import { rmFolder } from './helper';
 
 
 interface IDownloadVersion {
@@ -116,14 +117,3 @@ export function getZigBinary(): string {
   throw new Error('cannot find zig binary');
 }
 
-
-// TODO: move into helper module (also needed by cli.ts)
-function rmFolder(p: string) {
-  try {
-    fs.rmdirSync(p, { recursive: true });
-  } catch (e) {
-    try {
-      fs.rmSync(p, { recursive: true });
-    } catch (e) {}
-  }
-}

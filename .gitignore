@@ -3,7 +3,6 @@
 /node_modules/
 /.vscode
 
-
 /inwasm/node_modules/
 /inwasm/lib
 /inwasm/dist
@@ -15,5 +14,3 @@
 /testproject/dist
 /testproject/inwasm-sdks
 /testproject/inwasm-builds
-/testproject/wasm/*.wasm
-/testproject/emsdk

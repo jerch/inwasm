@@ -1,4 +1,4 @@
-import { InWasm, ExtractDefinition, OutputMode, OutputType, IWasmModule, IWasmInstance, WebAssemblyExtended } from 'inwasm';
+import { InWasm, OutputMode, OutputType, WebAssemblyExtended } from 'inwasm';
 
 
 const SETTINGS = {
@@ -191,26 +191,28 @@ const from_wat_ = InWasm({
 const from_wat = from_wat_();
 console.log(from_wat.exports.add(23, 42));
 
-// totally custom
-const custom = InWasm({
-  name: 'custom',
-  type: OutputType.INSTANCE,
-  mode: OutputMode.SYNC,
-  srctype: 'custom',
-  customRunner: (def, buildDir) => {
-    const cp = require('child_process');
-    const fs = require('fs');
-    cp.execSync('cd wasm && ./build.sh', { shell: '/bin/bash', stdio: 'inherit' });
-    return fs.readFileSync('wasm/convert.wasm');
-  },
-  exports: {
-    chunk_addr: () => 0,
-    target_addr: () => 0,
-    convert: (length: number) => 0
-  },
-  code: ''
-})();
-console.log(custom.exports);
+//// totally custom
+// commented out: old code deleted
+// FIXME: needs different test case...
+//const custom = InWasm({
+//  name: 'custom',
+//  type: OutputType.INSTANCE,
+//  mode: OutputMode.SYNC,
+//  srctype: 'custom',
+//  customRunner: (def, buildDir) => {
+//    const cp = require('child_process');
+//    const fs = require('fs');
+//    cp.execSync('cd wasm && ./build.sh', { shell: '/bin/bash', stdio: 'inherit' });
+//    return fs.readFileSync('wasm/convert.wasm');
+//  },
+//  exports: {
+//    chunk_addr: () => 0,
+//    target_addr: () => 0,
+//    convert: (length: number) => 0
+//  },
+//  code: ''
+//})();
+//console.log(custom.exports);
 
 
 // rust
@@ -232,81 +234,6 @@ const rust = InWasm({
 console.log(rust.exports.doubled(66));
 console.log(rust.exports.doubled(-333));
 
-
-
-
-
-
-/**
- * test proper type inference with manual bootstrapping
- */
-
-// generic losing all type info
-const mod = new WebAssembly.Module(second);
-
-// definition typed module
-const mod_typed1: IWasmModule<ExtractDefinition<typeof second>> = mod;
-const mod_typed2 = mod as IWasmModule<ExtractDefinition<typeof second>>;
-
-// generic instance
-const inst = new WebAssembly.Instance(mod, {env: env});
-
-// definition typed module from <typeof WasmBytes<T>>
-// FIXME: does not work yet due to weird memory type hack
-//const inst_typed1: WasmInstance<ExtractDefinition<typeof second>> = inst;
-const inst_typed2 = inst as IWasmInstance<ExtractDefinition<typeof second>>;
-
-// definition typed module from <typeof WasmBytes<T>>
-// FIXME: does not work yet due to weird memory type hack
-// FIXME: also needs import typing...
-// const inst_typed3: WasmInstance<ExtractDefinition<typeof mod_typed1>> =
-//   new WebAssembly.Instance(mod_typed1, {env: env});
-const inst_typed4 = new WebAssembly.Instance(mod_typed1, {env: env}) as
-    IWasmInstance<ExtractDefinition<typeof mod_typed1>>;
-
-
-
-/** typing tests on WebAssembly namespace */
-// FIXME: is there a way to test that automatically?
-/*
-// re-declare WebAssembly type
-const WAE = WebAssembly as typeof WebAssemblyExtended;
-
-// Module ctor overload
-const m_typed = new WAE.Module(second);
-const m_untyped = new WAE.Module(new Uint8Array());
-
-// Instance ctor overload
-const inst_typed = new WAE.Instance(m_typed, {env: env});
-const inst_untyped = new WAE.Instance(m_untyped);
-
-// compile overload
-const inst1 = WAE.compile(second);
-const inst2 = WAE.compile(new Uint8Array());
-
-// instantiate from bytes overload
-const inst3 = WAE.instantiate(second).then(i => i.instance);
-const inst4 = WAE.instantiate(new Uint8Array()).then(i => i.instance);
-
-// instantiate from module overload
-const inst5 = WAE.instantiate(m_typed);
-const inst6 = WAE.instantiate(m_untyped);
-
-
-// compileStreaming
-type secondDefinition = ExtractDefinition<typeof second>;
-const ff = fetch('hello') as Promise<WasmResponse<secondDefinition>>;
-const ff2: Promise<WasmResponse<secondDefinition>>  = fetch('hello');
-const ii = WAE.compileStreaming(ff2);
-
-const uu = fetch('nix');
-const xx = WAE.compileStreaming(uu);
-
-
-// instantiateStreaming
-const zz = WAE.instantiateStreaming(fetch('bla') as Promise<WasmResponse<secondDefinition>>).then(r => r.instance);
-const yy = WAE.instantiateStreaming(fetch('asd')).then(r => r.instance);
-*/
 
 
 

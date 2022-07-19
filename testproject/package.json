@@ -11,7 +11,7 @@
     "prepublish": "npm run build",
     "inwasm": "inwasm lib/*.wasm.js",
     "bundle": "tsc && inwasm lib/*.wasm.js && webpack",
-    "clean": "rm -rf lib dist inwasm-builds wasm/*.wasm wasm/settings.json",
+    "clean": "rm -rf lib dist inwasm-builds",
     "build": "npm run bundle"
   },
   "repository": "https://github.com/jerch/wasm-dummy",
