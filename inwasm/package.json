@@ -16,7 +16,10 @@
     "clean": "rm -rf lib",
     "build": "tsc"
   },
-  "repository": "https://github.com/jerch/wasm-dummy",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jerch/inwasm.git"
+  },
   "author": "Joerg Breitbart <j.breitbart@netzkolchose.de>",
   "license": "MIT",
   "devDependencies": {
