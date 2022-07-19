@@ -111,6 +111,7 @@ npm install
 - individual runner config options with proper TS typing
 - better docs
 - tests, tests, tests
+- windows support
 
 
 ### State
