@@ -3,8 +3,14 @@
 /node_modules/
 /.vscode
 
-# wasm artifacts
-/wasm/*.wasm
-/wasm/settings.json
-/src/wasm.ts
-/emsdk
+/inwasm/node_modules/
+/inwasm/lib
+/inwasm/dist
+/inwasm/emsdk
+/inwasm/inwasm-sdks
+
+/testproject/node_modules/
+/testproject/lib
+/testproject/dist
+/testproject/inwasm-sdks
+/testproject/inwasm-builds

@@ -25,6 +25,8 @@ jobs:
       uses: actions/setup-node@v3
       with:
         node-version: ${{ matrix.node-version }}
-        cache: 'npm'
-    - run: npm ci
-    - run: npm test
+    - run: rustup target add wasm32-unknown-unknown
+    - run: cd inwasm && npm install
+    - name: inwasm type tests
+      run: cd inwasm && npm run test-types
+    - run: cd testproject && npm install

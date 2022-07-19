@@ -1,18 +1,18 @@
 {
-  "name": "wasm-dummy",
+  "name": "testproject",
   "version": "0.0.1",
   "description": "wasm/emscripten with typescript and npm bundling test",
   "main": "./lib/index.js",
   "scripts": {
     "test": "mocha lib/*.test.js",
     "tsc": "tsc",
-    "watch": "tsc -w",
+    "watch": "tsc -w & inwasm -w 'lib/*.wasm.js' & wait",
     "start": "npm run bundle && http-server",
     "prepublish": "npm run build",
-    "build-wasm": "bin/install_emscripten.sh && cd wasm && ./build.sh && cd .. && node bin/wrap_wasm.js",
-    "bundle": "tsc --project tsconfig.json && webpack",
-    "clean": "rm -rf lib dist src/wasm.ts wasm/*.wasm wasm/settings.json",
-    "build": "npm run build-wasm && npm run tsc && npm run bundle"
+    "inwasm": "inwasm lib/*.wasm.js",
+    "bundle": "tsc && inwasm lib/*.wasm.js && webpack",
+    "clean": "rm -rf lib dist inwasm-builds",
+    "build": "npm run bundle"
   },
   "repository": "https://github.com/jerch/wasm-dummy",
   "author": "Joerg Breitbart <j.breitbart@netzkolchose.de>",
@@ -27,5 +27,8 @@
     "typescript": "^4.7.4",
     "webpack": "^5.73.0",
     "webpack-cli": "^4.10.0"
+  },
+  "dependencies": {
+    "inwasm": "file:../inwasm"
   }
 }
