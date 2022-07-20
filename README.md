@@ -71,7 +71,9 @@ yourself (e.g. directly reading from wasm memory segments). This "embedded progr
 like a big drawback, but in fact TS/JS is often fast enough to get most things done in a timely fashion,
 and just lacks proper performance at a certain point of some data conversion.
 Thats where `InWasm` can provide a much faster drop-in alternative to a pure TS/JS implementation,
-often with smaller overall footprint than a bigger wasm integration.
+normally with much smaller package footprint than a bigger wasm integration. `InWasm` itself is at
+~800 Bytes bundled, plus base64 string data of the generated binaries. Of course this further depends on
+the amount of your own glue code.
 
 Sidenote: Technically it would be possible to create a similar embedding experience for
 bigger wasm integrations. Well, that is questionable for several reasons, e.g. wasm files
