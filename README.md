@@ -70,7 +70,7 @@ performance at a certain point of some data conversion. Thats where `InWasm` can
 drop-in alternative to a pure TS/JS implementation.
 
 Sidenote: Technically it would be possible to create a similar embedding experience for
-bigger wasm integrations as well. Well that is questionable for several reasons
+bigger wasm integrations, too. Well that is questionable for several reasons
 (e.g. wasm files will get really big, not the best idea to wrap them inline in JS with base64),
 and it would need proper interfacing of the additional JS glue code. This is definitely
 out of scope for this library. For bigger integrations you are better served with
