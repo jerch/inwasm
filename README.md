@@ -129,7 +129,8 @@ there are some coding restrictions:
 With a file `inwasm.config.js` in your project root you can configure some settings of `inwasm`:
 
 ```javascript
-// default - autoinstall zig and emsdk:
+// default - autoinstall zig and emsdk
+// (no config file needed, if you are good to go with these)
 module.exports = {
   zig: {
     version: 'master',      // pulled sdk version
