@@ -56,25 +56,30 @@ to lift the initialization burden of the wasm types from the loading phase (lazy
 Furthermore the getter memorizes decoded bytes and wasm modules (act as static singletons).
 
 
-### What is it good for?
+### What is `InWasm` good for?
+
+**TL;DR:** Tiny standalone wasm helpers down to just one exposed function. Anything bigger - probably not,
+unless you love to write tons of glue code yourself.
 
 The main purpose of the library is to provide an easy way for embedding small standalone wasm helpers.
-Note that beside the wasm module bootstrapping there is no glue code at all, thus it cannot replace
-other bigger solutions with additional JS bridging output (like emscripten with its runtime extensions,
+Note that beside the wasm bootstrapping there is no glue code provided, thus it cannot replace more
+complex solutions with additional JS bridging output (like emscripten with its runtime extensions,
 wasm-bindgen etc).
 
 Due to missing glue code, things are very bare metal and you have to provide access and type wrappers
-yourself (yes this means reading from wasm memory segments yourself). This may sound like a big drawback,
-but in fact TS/JS is often fast enough to get most things done in a timely fashion, but lacks proper
-performance at a certain point of some data conversion. Thats where `InWasm` can provide a much faster
-drop-in alternative to a pure TS/JS implementation.
+yourself (e.g. directly reading from wasm memory segments). This "embedded programming style" may sound
+like a big drawback, but in fact TS/JS is often fast enough to get most things done in a timely fashion,
+and just lacks proper performance at a certain point of some data conversion.
+Thats where `InWasm` can provide a much faster drop-in alternative to a pure TS/JS implementation,
+often with smaller overall footprint than a bigger wasm integration.
 
 Sidenote: Technically it would be possible to create a similar embedding experience for
-bigger wasm integrations, too. Well that is questionable for several reasons
-(e.g. wasm files will get really big, not the best idea to wrap them inline in JS with base64),
-and it would need proper interfacing of the additional JS glue code. This is definitely
-out of scope for this library. For bigger integrations you are better served with
-the high level interfaces offered by emscripten and/or rust with wasm-bindgen.
+bigger wasm integrations. Well, that is questionable for several reasons, e.g. wasm files
+will grow really big, and inlining those in JS with base64 is a bad idea. Furthermore it would need
+proper interfacing of the additional JS glue code, which is definitely out of scope for this library.
+
+For bigger wasm integrations you are better served with the high level interfaces offered by emscripten
+and/or rust with wasm-bindgen.
 
 
 ### Supported source types, output types and modes
