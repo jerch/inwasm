@@ -79,7 +79,7 @@ the high level interfaces offered by emscripten and/or rust with wasm-bindgen.
 
 ### Supported source types, output types and modes
 
-Predefined source types (`srctype`):
+Source Types (`srctype`):
 - `'C'` (emscripten C)
 - `'C++'` (emscripten C++)
 - `'Clang-C'` (using clang from emscripten SDK)
@@ -88,14 +88,18 @@ Predefined source types (`srctype`):
 - `'Rust'` (must be preinstalled with `cargo` in PATH)
 - `'custom'` (any custom build script)
 
-Output types:
-- Uint8Array (raw wasm bytes), typed as `IWasmBytes<T>`
-- WebAssembly.Module, typed as `IWasmModule<T>`
-- WebAssembly.Instance, typed as `IWasmInstance<T>`
+Output Types:
+- `BYTES` - Uint8Array (raw wasm bytes), typed as `IWasmBytes<T extends IWasmDefinition>`
+- `MODULE` - WebAssembly.Module, typed as `IWasmModule<T extends IWasmDefinition>`
+- `INSTANCE` - WebAssembly.Instance, typed as `IWasmInstance<T extends IWasmDefinition>`
 
-Output modes:
-- SYNC
-- ASYNC (all output types above as promises)
+Output Modes:
+- `SYNC` - Getter bootstraps output type synchronously and returns it directly.
+- `ASYNC` - Getter bootstraps output type with asynchronous interfaces and returns a promise
+  resolving to the output type (e.g. `Promise<IWasmInstance<T>>`).
+
+Note that SYNC output mode works only reliable in NodeJS and a web worker context,
+as browsers may restrict synchronous wasm module or instance creation in the main context.
 
 
 ### Types & Type Inference
