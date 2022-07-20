@@ -137,7 +137,7 @@ module.exports = {
     store: 'project'        // where to store: 'project' or 'inwasm' folder
   },
   emsdk: {
-    version: 'master',
+    version: 'latest',
     store: 'project'
   },
 };
