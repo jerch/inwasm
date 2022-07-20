@@ -82,23 +82,27 @@ For bigger wasm integrations you are better served with the high level interface
 and/or rust with wasm-bindgen.
 
 
-### Supported source types, output types and modes
+### Supported Types and Modes
 
 Source Types (`srctype`):
-- `'C'` (emscripten C)
-- `'C++'` (emscripten C++)
-- `'Clang-C'` (using clang from emscripten SDK)
-- `'Clang-C++'` (using clang from emscripten SDK)
-- `'Zig'`
-- `'Rust'` (must be preinstalled with `cargo` in PATH)
-- `'custom'` (any custom build script)
+- `'C'` - emscripten C, compiled as standalone wasm
+- `'C++'` - emscripten C++, compiled as standalone wasm
+- `'Clang-C'` - using clang from emscripten SDK
+- `'Clang-C++'` - using clang from emscripten SDK
+- `'Zig'` - preinstalled or autoinstall, compiled as freestanding
+- `'wat'` - compiled with wat2wasm
+- `'Rust'` - must be preinstalled currently with `cargo` in PATH
+- `'custom'` - any custom build script
 
-Output Types:
+... TODO: document srctype extensions on wasm definitions ...
+
+
+Output Types (`type`):
 - `BYTES` - Uint8Array (raw wasm bytes), typed as `IWasmBytes<T extends IWasmDefinition>`
 - `MODULE` - WebAssembly.Module, typed as `IWasmModule<T extends IWasmDefinition>`
 - `INSTANCE` - WebAssembly.Instance, typed as `IWasmInstance<T extends IWasmDefinition>`
 
-Output Modes:
+Output Modes (`mode`):
 - `SYNC` - Getter bootstraps output type synchronously and returns it directly.
 - `ASYNC` - Getter bootstraps output type with asynchronous interfaces and returns a promise
   resolving to the output type (e.g. `Promise<IWasmInstance<T>>`).
