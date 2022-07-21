@@ -3,14 +3,14 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { execSync } from 'child_process';
-import { IWasmDefinition, CompilerRunner, _IWasmCtx } from '.';
+import { IWasmDefinition, CompilerRunner, _IWasmCtx, OutputMode, OutputType } from '.';
 
 import * as chokidar from 'chokidar';
 
 import * as acorn from 'acorn';
 import * as walk from 'acorn-walk';
 
-import { green } from 'colorette';
+import { green, yellow } from 'colorette';
 import { APP_ROOT, PROJECT_ROOT, CONFIG } from './config';
 
 // compiler runners
@@ -193,6 +193,16 @@ function formatBytes(bytes: number, decimals: number = 2): string {
 /**
  * Prepare build folder and call compiler backend.
  */
+/**
+ * TODO: implement conditional re-compilation:
+ * - on changes: diff definitions + additional source files (investigate how make determines recompilation)
+ * - -f/force_recompilation setting
+ *
+ * default: recompile only on changes
+ * also store last definition in build folders --> needed for diffing
+ * (bonus side effect: by committing the definition + final.wasm from builds folders later on,
+ * expensive recompilation with SDKs bootstrapping can be avoided) --> lifts burden from `npm install`
+ */
 function compileWasm(def: IWasmDefinition, filename: string): Buffer {
   // FIXME: ensure we are at project root path
   // create build folders
@@ -216,6 +226,10 @@ function compileWasm(def: IWasmDefinition, filename: string): Buffer {
   const call = `${wasm2wat} ${target + '.wasm'} -o ${target + '.wat'}`;
   execSync(call, { shell: '/bin/bash', stdio: 'inherit' });
   console.log(green('[inwasm compile]'), `Successfully built '${def.name}' (${formatBytes(result.length)}).\n`);
+  if (result.length > 40 && def.mode === OutputMode.SYNC && def.type !== OutputType.BYTES) {
+    console.log(yellow('[inwasm compile]'), `Warning: The generated wasm unit '${def.name}'`);
+    console.log('                 will most likely not work in browser main context.\n');
+  }
   return result;
 }
 
