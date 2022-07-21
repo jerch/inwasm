@@ -50,7 +50,7 @@ export interface IWasmDefinition {
     // Custom cmdline switches, overriding any from above. (TODO...)
     switches?: string[];
   };
-  customRunner?: (definition: IWasmDefinition, buildDir: string) => Uint8Array;
+  customRunner?: CompilerRunner;
   // Inline source code (C or C++).
   code: string
 }
@@ -260,6 +260,9 @@ export declare namespace WebAssemblyExtended {
 
   function validate(bytes: BufferSource): boolean;
 }
+
+// compiler runner
+export type CompilerRunner = (def: IWasmDefinition, buildDir: string) => Uint8Array;
 
 
 // tiny compile ctx for inwasm

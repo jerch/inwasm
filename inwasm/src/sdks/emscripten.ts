@@ -1,9 +1,9 @@
 import * as path from 'path';
 import * as fs from 'fs';
 import * as cp from 'child_process';
-import { rmFolder } from './helper';
+import { rmFolder } from '../helper';
 
-import { APP_ROOT, PROJECT_ROOT, CONFIG } from './config';
+import { APP_ROOT, PROJECT_ROOT, CONFIG } from '../config';
 
 
 /**

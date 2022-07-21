@@ -3,8 +3,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { execSync } from 'child_process';
-import { IWasmDefinition, _IWasmCtx } from '.';
-import { emscriptenRun, getClangBinPath, getEmscriptenPath } from './emscripten';
+import { IWasmDefinition, CompilerRunner, _IWasmCtx } from '.';
 
 import * as chokidar from 'chokidar';
 
@@ -13,7 +12,13 @@ import * as walk from 'acorn-walk';
 
 import { green } from 'colorette';
 import { APP_ROOT, PROJECT_ROOT, CONFIG } from './config';
-import { getZigBinary } from './zig';
+
+// compiler runners
+import emscripten_c from './runners/emscripten_c';
+import clang_c from './runners/clang_c';
+import zig from './runners/zig';
+import wat from './runners/wat';
+import rust from './runners/rust';
 
 
 
@@ -35,9 +40,6 @@ interface IStackFrameInfo {
   line: number;
   column: number;
 }
-
-
-type CompilerRunner = (def: IWasmDefinition, buildDir: string) => Buffer | Uint8Array;
 
 
 class InWasmReadExit extends Error { }
@@ -63,109 +65,15 @@ class InWasmReadExit extends Error { }
 // TODO: cleanup this mess
 // TODO: investigate on assemblyscript, make|shell template
 const COMPILER_RUNNERS: {[key: string]: CompilerRunner} = {
-  'C': (def: IWasmDefinition, buildDir: string) => {
-    // TODO: copy additional files
-    process.chdir(buildDir);
-    const src = `${def.name}.c`;
-    const target = `${def.name}.wasm`;
-    fs.writeFileSync(src, def.code);
-    // TODO: apply compile options properly
-    const opt = `-O3`;
-    const defines = Object.entries(def.compile?.defines || {})
-      .map(el => `-D${el[0]}=${el[1]}`).join(' ');
-    const _funcs = Object.entries(def.exports)
-      .filter(el => typeof el[1] === 'function')
-      .map(el => `"_${el[0]}"`)
-      .join(',');
-    let add_switches = '';
-    if (def.compile && def.compile.switches) {
-      add_switches = def.compile.switches.join(' ');
-    }
-    const switches = `-s ERROR_ON_UNDEFINED_SYMBOLS=0 -s WARN_ON_UNDEFINED_SYMBOLS=0 ` + add_switches;
-    const funcs = `-s EXPORTED_FUNCTIONS='[${_funcs}]'`;
-    const call = `emcc ${opt} ${defines} ${funcs} ${switches} --no-entry ${src} -o ${target}`;
-    emscriptenRun(call);
-    return fs.readFileSync(target);
-  },
-  'Clang-C': (def: IWasmDefinition, buildDir: string) => {
-    // TODO: copy additional files
-    process.chdir(buildDir);
-    const src = `${def.name}.c`;
-    const target = `${def.name}.wasm`;
-    fs.writeFileSync(src, def.code);
-    // TODO: apply compile options properly
-    const opt = `-O3`;
-    const defines = Object.entries(def.compile?.defines || {})
-      .map(el => `-D${el[0]}=${el[1]}`).join(' ');
-    let add_switches = '';
-    if (def.compile && def.compile.switches) {
-      add_switches = def.compile.switches.join(' ');
-    }
-    const ff = Object.entries(def.exports)
-      .filter(el => typeof el[1] === 'function' || el[1] instanceof WebAssembly.Global)
-      .map(el => `--export=${el[0]}`)
-      .join(',');
-    const clang = path.join(getClangBinPath(), 'clang');
-    const call = `${clang} --target=wasm32-unknown-unknown --no-standard-libraries -Wl,${ff} -Wl,--no-entry -Wl,--lto-O3 ${opt} -flto ${defines} -o ${target} ${src}`;
-    emscriptenRun(call);
-    return fs.readFileSync(target);
-  },
-  'Zig': (def: IWasmDefinition, buildDir: string) => {
-    const wd = process.cwd();
-    process.chdir(buildDir);
-    const src = `${def.name}.zig`;
-    const target = `${def.name}.wasm`;
-    fs.writeFileSync(src, def.code);
-    const ff = Object.entries(def.exports)
-      .filter(el => typeof el[1] === 'function' || el[1] instanceof WebAssembly.Global)
-      .map(el => `--export=${el[0]}`)
-      .join(' ');
-    const zig = getZigBinary();
-    const call = `${zig} build-lib ${src} -target wasm32-freestanding -dynamic -O ReleaseFast ${ff}`;
-    console.log(`\n[zig.run] ${call}`);
-    execSync(call, { shell: '/bin/bash', stdio: 'inherit' });
-    const wasmStrip = path.join(APP_ROOT, 'node_modules/wabt/bin/wasm-strip');
-    console.log(`\n[zig.run] ${wasmStrip} ${target}`);
-    execSync(`${wasmStrip} ${target}`, { shell: '/bin/bash', stdio: 'inherit' });
-    return fs.readFileSync(target);
-  },
-  'wat': (def: IWasmDefinition, buildDir: string) => {
-    const wd = process.cwd();
-    process.chdir(buildDir);
-    const src = `${def.name}.wat`;
-    const target = `${def.name}.wasm`;
-    fs.writeFileSync(src, def.code);
-    const wat2wasm = path.join(APP_ROOT, 'node_modules/wabt/bin/wat2wasm');
-    const wasmStrip = path.join(APP_ROOT, 'node_modules/wabt/bin/wasm-strip');
-    const call = `${wat2wasm} ${src} && ${wasmStrip} ${target}`;
-    console.log(`\n[wat.run] ${call}`);
-    execSync(call, { shell: '/bin/bash', stdio: 'inherit' });
-    return fs.readFileSync(target);
-  },
+  'C': emscripten_c,
+  'Clang-C': clang_c,
+  'Zig': zig,
+  'wat': wat,
+  'Rust': rust,
   'custom': (def: IWasmDefinition, buildDir: string) => {
     if (def.customRunner)
       return def.customRunner(def, buildDir);
     throw new Error('no customRunner defined');
-  },
-  'Rust': (def: IWasmDefinition, buildDir: string) => {
-    // NOTE: expects to have a valid cargo installation in PATH!!
-    const wd = process.cwd();
-    execSync(`cargo version`, { shell: '/bin/bash' });
-    fs.rmdirSync(buildDir, { recursive: true });
-    process.chdir(path.dirname(buildDir));
-    const src = path.join(buildDir, 'src', 'lib.rs');
-    const target = path.join(buildDir, 'target', 'wasm32-unknown-unknown', 'release', `${def.name}.wasm`);
-    console.log(`\n[rust.run] cargo new ${def.name} --lib`);
-    execSync(`cargo new ${def.name} --lib`, { shell: '/bin/bash', stdio: 'inherit' });
-    process.chdir(buildDir);
-    fs.writeFileSync(src, def.code);
-    fs.appendFileSync('Cargo.toml', '\n[lib]\ncrate-type = ["cdylib"]\n[profile.release]\nlto = true\n');
-    console.log(`\n[rust.run] cargo build --target wasm32-unknown-unknown --release`);
-    execSync(`cargo build --target wasm32-unknown-unknown --release`, { shell: '/bin/bash', stdio: 'inherit' });
-    const wasmStrip = path.join(APP_ROOT, 'node_modules/wabt/bin/wasm-strip');
-    console.log(`\n[rust.run] ${wasmStrip} ${target}`);
-    execSync(`${wasmStrip} ${target}`, { shell: '/bin/bash', stdio: 'inherit' });
-    return fs.readFileSync(target);
   }
 };
 
