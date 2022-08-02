@@ -18,31 +18,35 @@ export default function(def: IWasmDefinition, buildDir: string): Uint8Array {
     .filter(el => typeof el[1] === 'function')
     .map(el => `"_${el[0]}"`)
     .join(',');
-  let add_switches = '';
-  if (def.compile && def.compile.switches) {
-    add_switches = def.compile.switches.join(' ');
-  }
+  let switches: string[] = [];
   
   // memory settings
   const memorySettings = extractMemorySettings(def);
   if (memorySettings.descriptor) {
     if (memorySettings.descriptor.initial !== undefined) {
-      add_switches += ` -s INITIAL_MEMORY=${memorySettings.descriptor.initial * 65536}`;
+      switches.push(`-s INITIAL_MEMORY=${memorySettings.descriptor.initial * 65536}`);
     }
     if (memorySettings.descriptor.maximum !== undefined) {
       if (memorySettings.descriptor.initial !== memorySettings.descriptor.maximum) {
-        add_switches += ` -s MAXIMUM_MEMORY=${memorySettings.descriptor.maximum * 65536}`;
-        add_switches += ` -s ALLOW_MEMORY_GROWTH=1`;
+        switches.push(`-s MAXIMUM_MEMORY=${memorySettings.descriptor.maximum * 65536}`);
+        switches.push(`-s ALLOW_MEMORY_GROWTH=1`);
       }
     }
   }
   if (memorySettings.mode === 'imported') {
-    add_switches += ' -s IMPORTED_MEMORY=1';
+    switches.push('-s IMPORTED_MEMORY=1');
   }
 
-  const switches = `-s ERROR_ON_UNDEFINED_SYMBOLS=0 -s WARN_ON_UNDEFINED_SYMBOLS=0 ` + add_switches;
+  // apply custom switches late
+  if (def.compile && def.compile.switches) {
+    switches.push(...def.compile.switches);
+  }
+
+  // FIXME:
+  switches.push(...['-s ERROR_ON_UNDEFINED_SYMBOLS=0', '-s WARN_ON_UNDEFINED_SYMBOLS=0']);
+
   const funcs = `-s EXPORTED_FUNCTIONS='[${_funcs}]'`;
-  const call = `emcc ${opt} ${defines} ${funcs} ${switches} --no-entry ${src} -o ${target}`;
+  const call = `emcc ${opt} ${defines} ${funcs} ${switches.join(' ')} --no-entry ${src} -o ${target}`;
   emscriptenRun(call);
   return fs.readFileSync(target);
 }

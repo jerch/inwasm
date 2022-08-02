@@ -15,24 +15,25 @@ export default function(def: IWasmDefinition, buildDir: string): Uint8Array {
   const opt = `-O3`;
   const defines = Object.entries(def.compile?.defines || {})
     .map(el => `-D${el[0]}=${el[1]}`).join(' ');
-  let add_switches = '';
-  if (def.compile && def.compile.switches) {
-    add_switches = def.compile.switches.join(' ');
-  }
+  let switches: string[] = [];
 
   // memory settings
   const memorySettings = extractMemorySettings(def);
-  console.log(memorySettings);
   if (memorySettings.descriptor) {
     if (memorySettings.descriptor.initial !== undefined) {
-      add_switches += ` -Wl,--initial-memory=${memorySettings.descriptor.initial * 65536}`;
+      switches.push(`-Wl,--initial-memory=${memorySettings.descriptor.initial * 65536}`);
     }
     if (memorySettings.descriptor.maximum !== undefined) {
-      add_switches += ` -Wl,--max-memory=${memorySettings.descriptor.maximum * 65536}`;
+      switches.push(`-Wl,--max-memory=${memorySettings.descriptor.maximum * 65536}`);
     }
   }
   if (memorySettings.mode === 'imported') {
-    add_switches += ' -Wl,--import-memory';
+    switches.push('-Wl,--import-memory');
+  }
+
+  // apply custom switches late
+  if (def.compile && def.compile.switches) {
+    switches.push(...def.compile.switches);
   }
 
   const ff = Object.entries(def.exports)
@@ -40,7 +41,7 @@ export default function(def: IWasmDefinition, buildDir: string): Uint8Array {
     .map(el => `--export=${el[0]}`)
     .join(',');
   const clang = path.join(getClangBinPath(), 'clang');
-  const call = `${clang} --target=wasm32-unknown-unknown --no-standard-libraries -Wl,${ff} -Wl,--no-entry -Wl,--lto-O3 ${opt} ${add_switches} -flto ${defines} -o ${target} ${src}`;
+  const call = `${clang} --target=wasm32-unknown-unknown --no-standard-libraries -Wl,${ff} -Wl,--no-entry -Wl,--lto-O3 ${opt} ${switches.join(' ')} -flto ${defines} -o ${target} ${src}`;
   emscriptenRun(call);
   return fs.readFileSync(target);
 }

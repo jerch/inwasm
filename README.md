@@ -195,16 +195,16 @@ InWasm({
 });
 ```
 Exported function names are used to populate EXPORT directives of the compiler,
-where supported and not specified otherwise (e.g. in the code).
+where supported (not applied for *srctype* `wat` and `custom`).
 
 Exported values are not used for anything else beside type inference by TS,
 thus only need to reflect the proper type inteface, e.g. for an exported function
 it is enough to stub a function with the right argument types and return type.
 
-Imported names are used to populate IMPORT directives of the compiler,
-where supported and not specified otherwise (e.g. in the code). Since this is a
+Imported function names are used to populate IMPORT directives of the compiler,
+where supported (not applied for *srctype* `wat` and `custom`). Since this is a
 somewhat error-prone task across compilers, you might have to check manually during
-compilation or at runtime for unresolved symbols.
+compilation or at runtime for unresolvable symbols.
 
 Imported values are not used during compilation stage beside some basic type checks.
 The `importObj` should not be declared inline, unless you provide a similarly shaped
