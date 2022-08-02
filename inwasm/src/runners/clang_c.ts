@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { emscriptenRun, getClangBinPath } from '../sdks/emscripten';
 import { IWasmDefinition } from '..';
+import { extractMemorySettings } from '../helper';
 
 
 export default function(def: IWasmDefinition, buildDir: string): Uint8Array {
@@ -18,12 +19,28 @@ export default function(def: IWasmDefinition, buildDir: string): Uint8Array {
   if (def.compile && def.compile.switches) {
     add_switches = def.compile.switches.join(' ');
   }
+
+  // memory settings
+  const memorySettings = extractMemorySettings(def);
+  console.log(memorySettings);
+  if (memorySettings.descriptor) {
+    if (memorySettings.descriptor.initial !== undefined) {
+      add_switches += ` -Wl,--initial-memory=${memorySettings.descriptor.initial * 65536}`;
+    }
+    if (memorySettings.descriptor.maximum !== undefined) {
+      add_switches += ` -Wl,--max-memory=${memorySettings.descriptor.maximum * 65536}`;
+    }
+  }
+  if (memorySettings.mode === 'imported') {
+    add_switches += ' -Wl,--import-memory';
+  }
+
   const ff = Object.entries(def.exports)
     .filter(el => typeof el[1] === 'function' || el[1] instanceof WebAssembly.Global)
     .map(el => `--export=${el[0]}`)
     .join(',');
   const clang = path.join(getClangBinPath(), 'clang');
-  const call = `${clang} --target=wasm32-unknown-unknown --no-standard-libraries -Wl,${ff} -Wl,--no-entry -Wl,--lto-O3 ${opt} -flto ${defines} -o ${target} ${src}`;
+  const call = `${clang} --target=wasm32-unknown-unknown --no-standard-libraries -Wl,${ff} -Wl,--no-entry -Wl,--lto-O3 ${opt} ${add_switches} -flto ${defines} -o ${target} ${src}`;
   emscriptenRun(call);
   return fs.readFileSync(target);
 }

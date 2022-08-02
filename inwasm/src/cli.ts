@@ -210,6 +210,17 @@ function compileWasm(def: IWasmDefinition, filename: string): Buffer {
   if (!fs.existsSync(baseDir)) fs.mkdirSync(baseDir);
   const buildDir = path.join(baseDir, filename, def.name);
   if (!fs.existsSync(buildDir)) fs.mkdirSync(buildDir, {recursive: true});
+  else {
+    // conditional re-compilation
+    if (fs.existsSync(path.join(buildDir, 'final.wasm')) && fs.existsSync(path.join(buildDir, 'definition'))) {
+      const oldDef = fs.readFileSync(path.join(buildDir, 'definition'), {encoding: 'utf-8'});
+      // TODO: re-enable once we have a force recompilation switch
+      //if (oldDef === JSON.stringify(def)) {
+      //  console.log(green('[inwasm compile]'), `Skipping compilation of '${def.name}' (unchanged).\n`);
+      //  return fs.readFileSync(path.join(buildDir, 'final.wasm'));
+      //}
+    }
+  }
   const wd = process.cwd();
   let result: Buffer;
   try {
@@ -219,14 +230,15 @@ function compileWasm(def: IWasmDefinition, filename: string): Buffer {
     process.chdir(wd);
   }
   if (!result || !result.length) throw new Error('compile error');
-  // generate final.wasm and final.wat file in build folder
+  // generate final.wasm, final.wat and definition file in build folder
   const target = path.join(buildDir, 'final');
   fs.writeFileSync(target + '.wasm', result);
+  fs.writeFileSync(path.join(buildDir, 'definition'), JSON.stringify(def));
   const wasm2wat = path.join(APP_ROOT, 'node_modules/wabt/bin/wasm2wat');
   const call = `${wasm2wat} ${target + '.wasm'} -o ${target + '.wat'}`;
   execSync(call, { shell: '/bin/bash', stdio: 'inherit' });
   console.log(green('[inwasm compile]'), `Successfully built '${def.name}' (${formatBytes(result.length)}).\n`);
-  if (result.length > 40 && def.mode === OutputMode.SYNC && def.type !== OutputType.BYTES) {
+  if (result.length > 4095 && def.mode === OutputMode.SYNC && def.type !== OutputType.BYTES) {
     console.log(yellow('[inwasm compile]'), `Warning: The generated wasm unit '${def.name}'`);
     console.log('                 will most likely not work in browser main context.\n');
   }
@@ -239,7 +251,6 @@ function compileWasm(def: IWasmDefinition, filename: string): Buffer {
  */
 function createRuntimeDefinition(wasm: Buffer, wdef: IWasmSourceDefinition): string {
   const parts: string[] = [];
-  parts.push(`e:${wdef.definition.imports || 0}`);
   parts.push(`s:${wdef.definition.mode || 0}`);
   parts.push(`t:${wdef.definition.type || 0}`);
   parts.push(`d:'${wasm.toString('base64')}'`);

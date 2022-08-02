@@ -14,7 +14,6 @@ export default function(def: IWasmDefinition, buildDir: string): Uint8Array {
   const wat2wasm = path.join(APP_ROOT, 'node_modules/wabt/bin/wat2wasm');
   const wasmStrip = path.join(APP_ROOT, 'node_modules/wabt/bin/wasm-strip');
   const call = `${wat2wasm} ${src} && ${wasmStrip} ${target}`;
-  console.log(`\n[wat.run] ${call}`);
   execSync(call, { shell: '/bin/bash', stdio: 'inherit' });
   return fs.readFileSync(target);
 }

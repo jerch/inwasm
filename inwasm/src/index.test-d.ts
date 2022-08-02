@@ -1,6 +1,9 @@
 import { expectType } from 'tsd';
 import { ExtractDefinition, InWasm, IWasmBytes, IWasmInstance, IWasmModule, IWasmResponse, OutputMode, OutputType, WebAssemblyExtended } from './';
 
+
+// TODO: test imports type
+
 /**
  * Basic InWasm return types.
  */
@@ -72,7 +75,7 @@ expectType<() => Promise<IWasmModule<{
     code: ''
   })
 );
-expectType<() => IWasmInstance<{
+expectType<(importObject?: WebAssembly.Imports) => IWasmInstance<{
   name: string,
   type: OutputType.INSTANCE,
   mode: OutputMode.SYNC,
@@ -89,7 +92,7 @@ expectType<() => IWasmInstance<{
     code: ''
   })
 );
-expectType<() => Promise<IWasmInstance<{
+expectType<(importObject?: WebAssembly.Imports) => Promise<IWasmInstance<{
   name: string,
   type: OutputType.INSTANCE,
   mode: OutputMode.ASYNC,

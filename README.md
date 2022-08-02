@@ -19,7 +19,7 @@ const getAdderInstance = InWasm({
       return a + b;
     }`
 });
-const adderInstance = getAdderInstance();
+const adderInstance = getAdderInstance(); // optional argument: importObject
 
 // use the wasm instance:
 console.log(adderInstance.exports.add(23, 42));
@@ -178,6 +178,111 @@ INWASM_ZIG_BINARY=/path/to/zig inwasm lib/*wasm.js
 ```
 
 
+### Imports / Exports
+
+Imports and exports can be directly attached to the wasm definition:
+
+```typescript
+const importObj = { env: {...} };
+InWasm({
+  // exports should be inlined for proper type inference
+  exports: {
+    exportedFunctionName: type_stub_of_function,
+    ...
+  },
+  // imports should be referenced, otherwise object is lost at runtime
+  imports: importObj
+});
+```
+Exported function names are used to populate EXPORT directives of the compiler,
+where supported and not specified otherwise (e.g. in the code).
+
+Exported values are not used for anything else beside type inference by TS,
+thus only need to reflect the proper type inteface, e.g. for an exported function
+it is enough to stub a function with the right argument types and return type.
+
+Imported names are used to populate IMPORT directives of the compiler,
+where supported and not specified otherwise (e.g. in the code). Since this is a
+somewhat error-prone task across compilers, you might have to check manually during
+compilation or at runtime for unresolved symbols.
+
+Imported values are not used during compilation stage beside some basic type checks.
+The `importObj` should not be declared inline, unless you provide a similarly shaped
+object at runtime by other means. Note - every JS declaration within a wasm definition
+will be lost at runtime.
+
+At runtime `importsObj` should be provided as argument to the getter of `IWasmInstance`
+or any manual instance creation.
+
+
+### Memory Settings
+
+The runtime memory of the wasm module can be configured by applying a `memory` entry either
+in `exports` (compiled as exported memory) or in `imports.env` (compiled as imported memory):
+
+- exported memory:
+  ```typescript
+  InWasm({
+    ...
+    exports: {
+      ...
+      memory: WebAssembly.Memory({initial: 1, maximum: 1}),
+      ...
+    },
+    ...
+  });
+  ```
+
+- imported memory:
+  ```typescript
+  const importObj = {
+    env: {
+      ...
+      memory: WebAssembly.Memory({initial: 1, maximum: 1}),
+      ...
+    }
+  };
+
+  InWasm({
+    ...
+    imports: importObj,
+    ...
+  });
+  ```
+
+If no memory setting was given to a wasm definition, the module will default to exported memory
+of a certain size for most compilers, unless otherwise stated by other means (e.g. an explicit memory
+import directive within the code). Most of the time this will lead to much bigger initial memory allocations
+than needed at runtime (up to several MBs depending on compiler), or even wrong maximum limits.
+Therefore it is almost always a good idea to declare the memory explicitly to keep the footprint as small
+as possible.
+
+If you use shared memory, your NodeJS version of the build system should be greater than v14, as v14 does
+not yet support the `shared` flag in the memory descriptor, thus `inwasm` might not handle it correctly.
+
+Very small wasm functions might not need any memory at all. This edge case can occur for pure reentrant functions,
+that dont rely on any outer state (global static data), do no stack or heap interactions and handle all needed data
+through arguments and the return value. (Also note that the term "stack" might be misleading with wasm, as the stack
+is not used the same way as on other architectures, e.g. wasm-native local variables dont live on that "stack".)
+Such a no-memory mode is not directly possible with most compilers, as most assume some sort of memory being attached,
+even if unused. It still can be faked with some compilers by importing or exporting a 0-page memory,
+which should strip any memory notion from the wasm file, if it is really free of any memory access
+(double check the final wat file). Always do proper runtime checks, when doing such an aggressive optimization.
+
+Set stack size to zero:
+- emscripten: add switch `'-s TOTAL_STACK=0'`
+- clang: add switch `'-Wl,-z,stack-size=0'`
+- zig: add switch `'--stack 0'`
+- rust: ???
+
+Builtins for `memory.size` and `memory.grow` (useful for writing own allocator):
+- emscripten/Clang: `__builtin_wasm_memory_size(0)`, `__builtin_wasm_memory_grow(0, delta)`
+- zig: `@wasmMemorySize(0)`, `@wasmMemoryGrow(0, delta)`
+- rust: `memory_size(0)`, `memory_grow(0, delta)`
+
+where `delta` is number of memory pages to be added and `0` the memory identifier (currently restricted to just one)
+
+
 ### Development
 
 The source repo contains two node package folders:
@@ -199,6 +304,7 @@ npm install
 
 ### TODO
 
+- better import/export handling
 - ESM support
 - better config, option to write to different file
 - individual runner config options with proper TS typing
