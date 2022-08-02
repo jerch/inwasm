@@ -273,7 +273,7 @@ Set stack size to zero:
 - emscripten: add switch `'-s TOTAL_STACK=0'`
 - clang: add switch `'-Wl,-z,stack-size=0'`
 - zig: add switch `'--stack 0'`
-- rust: ???
+- rust: add switch `'-Clink-args="-z stack-size=0"'`
 
 Builtins for `memory.size` and `memory.grow` (useful for writing own allocator):
 - emscripten/Clang: `__builtin_wasm_memory_size(0)`, `__builtin_wasm_memory_grow(0, delta)`
