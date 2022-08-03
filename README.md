@@ -88,15 +88,13 @@ and/or rust with wasm-bindgen.
 
 Source Types (`srctype`):
 - `'C'` - emscripten C, compiled as standalone wasm
-- `'C++'` - emscripten C++, compiled as standalone wasm
 - `'Clang-C'` - using clang from emscripten SDK
-- `'Clang-C++'` - using clang from emscripten SDK
 - `'Zig'` - preinstalled or autoinstall, compiled as freestanding
 - `'wat'` - compiled with wat2wasm
 - `'Rust'` - must be preinstalled currently with `cargo` in PATH
 - `'custom'` - any custom build script
 
-... TODO: document srctype extensions on wasm definitions ...
+... TODO: document srctype extensions on wasm definitions, C++ runners ...
 
 
 Output Types (`type`):
@@ -257,17 +255,14 @@ than needed at runtime (up to several MBs depending on compiler), or even wrong 
 Therefore it is almost always a good idea to declare the memory explicitly to keep the footprint as small
 as possible.
 
-If you use shared memory, your NodeJS version of the build system should be greater than v14, as v14 does
-not yet support the `shared` flag in the memory descriptor, thus `inwasm` might not handle it correctly.
-
 Very small wasm functions might not need any memory at all. This edge case can occur for pure reentrant functions,
 that dont rely on any outer state (global static data), do no stack or heap interactions and handle all needed data
 through arguments and the return value. (Also note that the term "stack" might be misleading with wasm, as the stack
 is not used the same way as on other architectures, e.g. wasm-native local variables dont live on that "stack".)
-Such a no-memory mode is not directly possible with most compilers, as most assume some sort of memory being attached,
+Such a no-memory mode is not directly possible with some compilers, as they assume some sort of memory being attached,
 even if unused. It still can be faked with some compilers by importing or exporting a 0-page memory,
 which should strip any memory notion from the wasm file, if it is really free of any memory access
-(double check the final wat file). Always do proper runtime checks, when doing such an aggressive optimization.
+(double check the final wat file). Always do proper runtime checks with such an aggressive optimization.
 
 Set stack size to zero:
 - emscripten: add switch `'-s TOTAL_STACK=0'`
@@ -280,7 +275,49 @@ Builtins for `memory.size` and `memory.grow` (useful for writing own allocator):
 - zig: `@wasmMemorySize(0)`, `@wasmMemoryGrow(0, delta)`
 - rust: `memory_size(0)`, `memory_grow(0, delta)`
 
-where `delta` is number of memory pages to be added and `0` the memory identifier (currently restricted to just one)
+where `delta` is the number of memory pages to be added and `0` the memory identifier
+(currently restricted to just one memory).
+
+
+### WASM features
+
+Due to the way `inwasm` operates your nodejs version of the build process should support any WASM feature
+used in your definitions (you can test support with the npm package *wasm-check*).
+
+If you are bound to an older node version or use cutting edge features, you can try to enable missing features
+with these node cmdline switches:
+
+- Reference types (--experimental-wasm-anyref)
+- BigInt between js and wasm (--experimental-wasm-bigint)
+- Bulk memory operations (--experimental-wasm-bulk-memory)
+- Exceptions (--experimental-wasm-eh)
+- Multi values (--experimental-wasm-mv)
+- Tail recursion calls (--experimental-wasm-return-call)
+- Saturated (non-trapping) conversions from float to int (--experimental-wasm-sat-f2i-conversions)
+- Sign/zero extensions (--experimental-wasm-se)
+- SIMD (--experimental-wasm-simd)
+- Threads (--experimental-wasm-threads)
+- Type reflection (--experimental-wasm-type-reflection)
+
+Currently the compiler runners are not yet fully prepared to apply additional wasm features correctly
+to all build steps and thus might break for certain non-default features. This will be sorted out with
+the next PRs.
+
+
+### Testing with `InWasm`
+
+`InWasm` declarations should not be used directly in mocha tests, as the needed code transformations may not
+run on import by `inwasm`, if placed inside of mocha's test suite calls like `describe` or `it`,
+thus mocha would always end up with a `must run "inwasm"` error. Also running `inwasm` on such a test file
+will create various errors for unresolved mocha defines. (This repo uses a very limited *mocha_shim*
+to overcome this, but thats not meant for general purpose testing needs.)
+
+Instead place the `InWasm` definitions into a separate module imported by the tests and run `inwasm`
+on the separate modules before calling mocha on the test files.
+
+Isolated testing and debugging of the wasm code itself is currently very limited. A future version
+may provide better support, until then use close unit/API testing on TS/JS side. Since things
+are currently really bare metal, this might even involve writing your own console logging shims.
 
 
 ### Development

@@ -46,6 +46,20 @@ class InWasmReadExit extends Error { }
 
 
 /**
+ * TODO:
+ * - cmdline switch + config option for: force-recompile -force
+ * - config option for: builddir (default: PROJECT/inwasm-builds)
+ * - cmdline switch + config option for fail behavior:
+ *    - fail-hard: stop at any error with returncode != 0
+ *    - fail-soft: build as much as possible, returncode != 0
+ *    - no-fail: only report errors, returncode 0 (default in watch mode)
+ * - verbosity - silence most by default, escalate with -v, -vv etc.
+ * - precalc MemorySettings, provide as arugment to runners + save for skip logic
+ * - create easy loadable mocha shims
+ */
+
+
+/**
  * clang specifics
  *
  * https://lld.llvm.org/WebAssembly.html
@@ -62,8 +76,6 @@ class InWasmReadExit extends Error { }
  */
 
 
-// TODO: cleanup this mess
-// TODO: investigate on assemblyscript, make|shell template
 const COMPILER_RUNNERS: {[key: string]: CompilerRunner} = {
   'C': emscripten_c,
   'Clang-C': clang_c,
@@ -204,6 +216,7 @@ function formatBytes(bytes: number, decimals: number = 2): string {
  * expensive recompilation with SDKs bootstrapping can be avoided) --> lifts burden from `npm install`
  */
 function compileWasm(def: IWasmDefinition, filename: string): Buffer {
+  console.log(yellow('[inwasm compile]'), `Building ${filename}:${def.name}`);
   // FIXME: ensure we are at project root path
   // create build folders
   const baseDir = path.resolve('./inwasm-builds');
@@ -215,10 +228,10 @@ function compileWasm(def: IWasmDefinition, filename: string): Buffer {
     if (fs.existsSync(path.join(buildDir, 'final.wasm')) && fs.existsSync(path.join(buildDir, 'definition'))) {
       const oldDef = fs.readFileSync(path.join(buildDir, 'definition'), {encoding: 'utf-8'});
       // TODO: re-enable once we have a force recompilation switch
-      //if (oldDef === JSON.stringify(def)) {
-      //  console.log(green('[inwasm compile]'), `Skipping compilation of '${def.name}' (unchanged).\n`);
-      //  return fs.readFileSync(path.join(buildDir, 'final.wasm'));
-      //}
+      if (oldDef === JSON.stringify(def)) {
+        console.log(green('[inwasm compile]'), `Skipping compilation of '${def.name}' (unchanged).\n`);
+        return fs.readFileSync(path.join(buildDir, 'final.wasm'));
+      }
     }
   }
   const wd = process.cwd();
@@ -235,6 +248,7 @@ function compileWasm(def: IWasmDefinition, filename: string): Buffer {
   fs.writeFileSync(target + '.wasm', result);
   fs.writeFileSync(path.join(buildDir, 'definition'), JSON.stringify(def));
   const wasm2wat = path.join(APP_ROOT, 'node_modules/wabt/bin/wasm2wat');
+  // FIXME: how to deal with custom features here, and in runners?
   const call = `${wasm2wat} ${target + '.wasm'} -o ${target + '.wat'}`;
   execSync(call, { shell: '/bin/bash', stdio: 'inherit' });
   console.log(green('[inwasm compile]'), `Successfully built '${def.name}' (${formatBytes(result.length)}).\n`);

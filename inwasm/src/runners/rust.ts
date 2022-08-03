@@ -3,14 +3,14 @@ import * as path from 'path';
 import { execSync } from 'child_process';
 import { IWasmDefinition } from '..';
 import { APP_ROOT } from '../config';
-import { extractMemorySettings } from '../helper';
+import { extractMemorySettings, rmFolder } from '../helper';
 
 
 export default function(def: IWasmDefinition, buildDir: string): Uint8Array {
   // NOTE: expects to have a valid cargo installation in PATH!!
   const wd = process.cwd();
   execSync(`cargo version`, { shell: '/bin/bash' });
-  fs.rmdirSync(buildDir, { recursive: true });
+  rmFolder(buildDir);
   process.chdir(path.dirname(buildDir));
   const src = path.join(buildDir, 'src', 'lib.rs');
   const target = path.join(buildDir, 'target', 'wasm32-unknown-unknown', 'release', `${def.name}.wasm`);

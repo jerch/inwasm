@@ -1,14 +1,11 @@
 import * as fs from 'fs';
 import { IWasmDefinition } from '.';
 
+
 export function rmFolder(p: string) {
   try {
-    fs.rmdirSync(p, { recursive: true });
-  } catch (e) {
-    try {
-      fs.rmSync(p, { recursive: true });
-    } catch (e) {}
-  }
+    fs[process.version > 'v15' ? 'rmSync' : 'rmdirSync'](p, { recursive: true });
+  } catch (e) {}
 }
 
 
