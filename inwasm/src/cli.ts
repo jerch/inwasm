@@ -76,7 +76,7 @@ class InWasmReadExit extends Error { }
  */
 
 
-const COMPILER_RUNNERS: {[key: string]: CompilerRunner} = {
+const COMPILER_RUNNERS: { [key: string]: CompilerRunner } = {
   'C': emscripten_c,
   'Clang-C': clang_c,
   'Zig': zig,
@@ -102,7 +102,7 @@ let UNITS: IWasmSourceDefinition[] = [];
       throw new InWasmReadExit('exit');
     } catch (e) {
       if (e instanceof InWasmReadExit)
-        UNITS.push({definition, stack: e.stack || ''});
+        UNITS.push({ definition, stack: e.stack || '' });
       throw e;
     }
   }
@@ -222,15 +222,17 @@ function compileWasm(def: IWasmDefinition, filename: string): Buffer {
   const baseDir = path.resolve('./inwasm-builds');
   if (!fs.existsSync(baseDir)) fs.mkdirSync(baseDir);
   const buildDir = path.join(baseDir, filename, def.name);
-  if (!fs.existsSync(buildDir)) fs.mkdirSync(buildDir, {recursive: true});
+  if (!fs.existsSync(buildDir)) fs.mkdirSync(buildDir, { recursive: true });
   else {
-    // conditional re-compilation
-    if (fs.existsSync(path.join(buildDir, 'final.wasm')) && fs.existsSync(path.join(buildDir, 'definition'))) {
-      const oldDef = fs.readFileSync(path.join(buildDir, 'definition'), {encoding: 'utf-8'});
-      // TODO: re-enable once we have a force recompilation switch
-      if (oldDef === JSON.stringify(def)) {
-        console.log(green('[inwasm compile]'), `Skipping compilation of '${def.name}' (unchanged).\n`);
-        return fs.readFileSync(path.join(buildDir, 'final.wasm'));
+    if (!SWITCHES.force) {
+      // conditional re-compilation
+      if (fs.existsSync(path.join(buildDir, 'final.wasm')) && fs.existsSync(path.join(buildDir, 'definition'))) {
+        const oldDef = fs.readFileSync(path.join(buildDir, 'definition'), { encoding: 'utf-8' });
+        // TODO: re-enable once we have a force recompilation switch
+        if (oldDef === JSON.stringify(def)) {
+          console.log(green('[inwasm compile]'), `Skipping compilation of '${def.name}' (unchanged).\n`);
+          return fs.readFileSync(path.join(buildDir, 'final.wasm'));
+        }
       }
     }
   }
@@ -368,7 +370,6 @@ const DEFAULT_GLOB = ['./**/*.wasm.js']
  * Run in watch mode.
  */
 function runWatcher(args: string[]) {
-  args.splice(args.indexOf('-w'), 1);
   const pattern = args.length ? args : DEFAULT_GLOB;
   console.log(`Starting watch mode with pattern ${pattern.join(' ')}`);
   chokidar.watch(pattern).on('all', async (event, filename) => {
@@ -385,13 +386,39 @@ function runWatcher(args: string[]) {
 }
 
 
-async function main() {
-  const args = process.argv.slice(2);
+// some cmdline switches
+const SWITCHES = {
+  watch: false,
+  force: false
+};
+
+
+function extractSwitches(args: string[]): string[] {
+  /**
+   * known switches:
+   *  -w    watch mode
+   *  -f    force recompilation
+   * more to come...
+   */
   if (args.indexOf('-w') !== -1) {
+    args.splice(args.indexOf('-w'), 1);
+    SWITCHES.watch = true;
+  }
+  if (args.indexOf('-f') !== -1) {
+    args.splice(args.indexOf('-f'), 1);
+    SWITCHES.force = true;
+  }
+  return args;
+}
+
+
+async function main() {
+  const args = extractSwitches(process.argv.slice(2));
+  if (SWITCHES.watch) {
     return runWatcher(args);
   }
   if (!args.length) {
-    return console.log(`usage: inwasm [-w] files|glob`);
+    return console.log(`usage: inwasm [-wf] files|glob`);
   }
   for (const filename of args) {
     await processFile(filename);
