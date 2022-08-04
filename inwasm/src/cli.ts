@@ -11,7 +11,7 @@ import * as acorn from 'acorn';
 import * as walk from 'acorn-walk';
 
 import { green, yellow } from 'colorette';
-import { APP_ROOT, PROJECT_ROOT, CONFIG } from './config';
+import { APP_ROOT, PROJECT_ROOT, CONFIG, WABT_PATH } from './config';
 
 // compiler runners
 import emscripten_c from './runners/emscripten_c';
@@ -247,7 +247,7 @@ function compileWasm(def: IWasmDefinition, filename: string): Buffer {
   const target = path.join(buildDir, 'final');
   fs.writeFileSync(target + '.wasm', result);
   fs.writeFileSync(path.join(buildDir, 'definition'), JSON.stringify({def, memorySettings}));
-  const wasm2wat = path.join(APP_ROOT, 'node_modules/wabt/bin/wasm2wat');
+  const wasm2wat = path.join(WABT_PATH, 'wasm2wat');
   // FIXME: how to deal with custom features here, and in runners?
   const call = `${wasm2wat} ${target + '.wasm'} -o ${target + '.wat'}`;
   execSync(call, { shell: '/bin/bash', stdio: 'inherit' });

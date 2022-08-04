@@ -3,7 +3,7 @@ import * as path from 'path';
 import { execSync } from 'child_process';
 import { getZigBinary } from '../sdks/zig';
 import { IMemorySettings, IWasmDefinition } from '..';
-import { APP_ROOT } from '../config';
+import { APP_ROOT, WABT_PATH } from '../config';
 
 
 export default function(def: IWasmDefinition, buildDir: string, filename: string, memorySettings: IMemorySettings): Uint8Array {
@@ -41,7 +41,7 @@ export default function(def: IWasmDefinition, buildDir: string, filename: string
   const call = `${zig} build-lib ${src} -target wasm32-freestanding -dynamic -O ReleaseFast ${ff} ${switches.join(' ')}`;
   console.log(`\n[zig.run] ${call}`);
   execSync(call, { shell: '/bin/bash', stdio: 'inherit' });
-  const wasmStrip = path.join(APP_ROOT, 'node_modules/wabt/bin/wasm-strip');
+  const wasmStrip = path.join(WABT_PATH, 'wasm-strip');
   console.log(`\n[zig.run] ${wasmStrip} ${target}`);
   execSync(`${wasmStrip} ${target}`, { shell: '/bin/bash', stdio: 'inherit' });
   return fs.readFileSync(target);

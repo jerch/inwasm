@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { execSync } from 'child_process';
 import { IMemorySettings, IWasmDefinition } from '..';
-import { APP_ROOT } from '../config';
+import { APP_ROOT, WABT_PATH } from '../config';
 import { rmFolder } from '../helper';
 
 
@@ -43,7 +43,7 @@ export default function(def: IWasmDefinition, buildDir: string, filename: string
   const call = `cargo rustc --target wasm32-unknown-unknown --release -- ${switches.join(' ')}`;
   console.log(`\n[rust.run] ${call}`);
   execSync(call, { shell: '/bin/bash', stdio: 'inherit' });
-  const wasmStrip = path.join(APP_ROOT, 'node_modules/wabt/bin/wasm-strip');
+  const wasmStrip = path.join(WABT_PATH, 'wasm-strip');
   console.log(`\n[rust.run] ${wasmStrip} ${target}`);
   execSync(`${wasmStrip} ${target}`, { shell: '/bin/bash', stdio: 'inherit' });
   return fs.readFileSync(target);

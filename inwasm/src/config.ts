@@ -171,3 +171,13 @@ function getConfig(): IConfig {
   return final;
 }
 export const CONFIG = getConfig();
+
+
+function getWabtPath(): string {
+  const inApp = path.join(APP_ROOT, 'node_modules', 'wabt', 'bin');
+  if (fs.existsSync(inApp)) {
+    return inApp;
+  }
+  return path.join(PROJECT_ROOT, 'node_modules', 'wabt', 'bin');
+}
+export const WABT_PATH = getWabtPath();
