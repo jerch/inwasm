@@ -168,6 +168,17 @@ function getConfig(): IConfig {
   // merge with env overrides
   merge(final, getEnvOverrides());
 
+  // force absolute path expansion for zig.binary and emsdk.path
+  if (final.zig && final.zig.hasOwnProperty('binary')) {
+    const zigPath = (final.zig as any).binary;
+    if (path.basename(zigPath) !== zigPath) {
+      (final.zig as any).binary = path.resolve(zigPath);
+    }
+  }
+  if (final.emsdk && final.emsdk.hasOwnProperty('path')) {
+    (final.emsdk as any).path = path.resolve((final.emsdk as any).path);
+  }
+
   return final;
 }
 export const CONFIG = getConfig();
