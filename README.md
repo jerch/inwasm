@@ -199,18 +199,22 @@ Exported values are not used for anything else beside type inference by TS,
 thus only need to reflect the proper type inteface, e.g. for an exported function
 it is enough to stub a function with the right argument types and return type.
 
-Imported function names are used to populate IMPORT directives of the compiler,
-where supported (not applied for *srctype* `wat` and `custom`). Since this is a
-somewhat error-prone task across compilers, you might have to check manually during
-compilation or at runtime for unresolvable symbols.
+Imported names are not further evaluated in the compiler runners beside a `memory`
+entry. Currently only clang exposes an interface to declare imported symbol names
+upfront (*--allow-undefined-file* switch), which is not yet applied by `inwasm`.
+Thus you have to take care yourself to match expected imports later at runtime.
 
-Imported values are not used during compilation stage beside some basic type checks.
 The `importObj` should not be declared inline, unless you provide a similarly shaped
-object at runtime by other means. Note - every JS declaration within a wasm definition
-will be lost at runtime.
+object at runtime by other means. (Note: every JS declaration within a wasm definition
+will be lost at runtime.)
 
 At runtime `importsObj` should be provided as argument to the getter of `IWasmInstance`
 or any manual instance creation.
+
+Note on other import/export symbol types than memory or functions - WASM furthermore
+allows types of *WebAssembly.Global* and *WebAssembly.Table* to be imported or exported.
+Your success here may vary, as some compilers dont support them equally, thus `inwasm`
+does not further deal with those.
 
 
 ### Memory Settings

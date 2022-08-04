@@ -68,6 +68,7 @@ class InWasmReadExit extends Error { }
  * https://surma.dev/things/c-to-webassembly/
  * https://github.com/jedisct1/libclang_rt.builtins-wasm32.a
  * https://depth-first.com/articles/2019/10/16/compiling-c-to-webassembly-and-running-it-without-emscripten/
+ * https://aransentin.github.io/cwasm/
  *
  * __attribute__((import_module("env"), import_name("externalFunction"))) void externalFunction(void);
  * __attribute__((export_name(<name>)))
