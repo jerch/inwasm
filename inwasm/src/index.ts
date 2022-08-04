@@ -263,7 +263,22 @@ export declare namespace WebAssemblyExtended {
 }
 
 // compiler runner
-export type CompilerRunner = (def: IWasmDefinition, buildDir: string) => Uint8Array;
+export type CompilerRunner = (def: IWasmDefinition, buildDir: string, filename: string, memorySettings: IMemorySettings) => Uint8Array;
+
+// memory settings extracted from wasm definition
+export interface IMemorySettings {
+  /**
+   * Memory descriptor as derived from the wasm definition.
+   * Might be undefined in case, no memory directive was found in wasm definition.
+   * Not using any memory directive is discouraged, as it has several drawbacks:
+   * - real allocated memory at runtime is compiler dependent (undefined behavior for inwasm)
+   * - memory tends to be much bigger than really needed (runtime penalty)
+   * - memory is still exposed in exports, but not properly typed anymore 
+   */
+  descriptor?: WebAssembly.MemoryDescriptor;
+  /** Whether the memory is imported or exported. */
+  mode: 'imported' | 'exported';
+}
 
 
 // tiny compile ctx for inwasm

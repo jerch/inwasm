@@ -1,11 +1,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { execSync } from 'child_process';
-import { IWasmDefinition } from '..';
+import { IMemorySettings, IWasmDefinition } from '..';
 import { APP_ROOT } from '../config';
 
 
-export default function(def: IWasmDefinition, buildDir: string): Uint8Array {
+export default function(def: IWasmDefinition, buildDir: string, filename: string, memorySettings: IMemorySettings): Uint8Array {
   const wd = process.cwd();
   process.chdir(buildDir);
   const src = `${def.name}.wat`;

@@ -2,12 +2,11 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { execSync } from 'child_process';
 import { getZigBinary } from '../sdks/zig';
-import { IWasmDefinition } from '..';
+import { IMemorySettings, IWasmDefinition } from '..';
 import { APP_ROOT } from '../config';
-import { extractMemorySettings } from '../helper';
 
 
-export default function(def: IWasmDefinition, buildDir: string): Uint8Array {
+export default function(def: IWasmDefinition, buildDir: string, filename: string, memorySettings: IMemorySettings): Uint8Array {
   const wd = process.cwd();
   process.chdir(buildDir);
   const src = `${def.name}.zig`;
@@ -21,7 +20,6 @@ export default function(def: IWasmDefinition, buildDir: string): Uint8Array {
   let switches: string[] = [];
 
   // memory settings
-  const memorySettings = extractMemorySettings(def);
   if (memorySettings.descriptor) {
     if (memorySettings.descriptor.initial !== undefined) {
       switches.push(`--initial-memory=${memorySettings.descriptor.initial * 65536}`);

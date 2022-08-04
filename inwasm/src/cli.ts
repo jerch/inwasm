@@ -19,7 +19,8 @@ import clang_c from './runners/clang_c';
 import zig from './runners/zig';
 import wat from './runners/wat';
 import rust from './runners/rust';
-
+import custom from './runners/custom';
+import { extractMemorySettings } from './helper';
 
 
 console.log(green('[inwasm config]'), 'used configration:');
@@ -54,8 +55,6 @@ class InWasmReadExit extends Error { }
  *    - fail-soft: build as much as possible, returncode != 0
  *    - no-fail: only report errors, returncode 0 (default in watch mode)
  * - verbosity - silence most by default, escalate with -v, -vv etc.
- * - precalc MemorySettings, provide as arugment to runners + save for skip logic
- * - create easy loadable mocha shims
  */
 
 
@@ -83,11 +82,7 @@ const COMPILER_RUNNERS: { [key: string]: CompilerRunner } = {
   'Zig': zig,
   'wat': wat,
   'Rust': rust,
-  'custom': (def: IWasmDefinition, buildDir: string) => {
-    if (def.customRunner)
-      return def.customRunner(def, buildDir);
-    throw new Error('no customRunner defined');
-  }
+  'custom': custom
 };
 
 
@@ -219,6 +214,8 @@ function formatBytes(bytes: number, decimals: number = 2): string {
 function compileWasm(def: IWasmDefinition, filename: string): Buffer {
   console.log(yellow('[inwasm compile]'), `Building ${filename}:${def.name}`);
   // FIXME: ensure we are at project root path
+  // get memory settings
+  const memorySettings = extractMemorySettings(def);
   // create build folders
   const baseDir = path.resolve('./inwasm-builds');
   if (!fs.existsSync(baseDir)) fs.mkdirSync(baseDir);
@@ -230,8 +227,8 @@ function compileWasm(def: IWasmDefinition, filename: string): Buffer {
       if (fs.existsSync(path.join(buildDir, 'final.wasm')) && fs.existsSync(path.join(buildDir, 'definition'))) {
         const oldDef = fs.readFileSync(path.join(buildDir, 'definition'), { encoding: 'utf-8' });
         // TODO: re-enable once we have a force recompilation switch
-        if (oldDef === JSON.stringify(def)) {
-          console.log(green('[inwasm compile]'), `Skipping compilation of '${def.name}' (unchanged).\n`);
+        if (oldDef === JSON.stringify({def, memorySettings})) {
+          console.log(green('[inwasm compile]'), `Skipping '${def.name}' (unchanged).\n`);
           return fs.readFileSync(path.join(buildDir, 'final.wasm'));
         }
       }
@@ -240,7 +237,7 @@ function compileWasm(def: IWasmDefinition, filename: string): Buffer {
   const wd = process.cwd();
   let result: Buffer;
   try {
-    result = Buffer.from(COMPILER_RUNNERS[def.srctype](def, buildDir));
+    result = Buffer.from(COMPILER_RUNNERS[def.srctype](def, buildDir, filename, memorySettings));
     // FIXME: abort on error...
   } finally {
     process.chdir(wd);
@@ -249,7 +246,7 @@ function compileWasm(def: IWasmDefinition, filename: string): Buffer {
   // generate final.wasm, final.wat and definition file in build folder
   const target = path.join(buildDir, 'final');
   fs.writeFileSync(target + '.wasm', result);
-  fs.writeFileSync(path.join(buildDir, 'definition'), JSON.stringify(def));
+  fs.writeFileSync(path.join(buildDir, 'definition'), JSON.stringify({def, memorySettings}));
   const wasm2wat = path.join(APP_ROOT, 'node_modules/wabt/bin/wasm2wat');
   // FIXME: how to deal with custom features here, and in runners?
   const call = `${wasm2wat} ${target + '.wasm'} -o ${target + '.wat'}`;

@@ -1,5 +1,5 @@
 import * as fs from 'fs';
-import { IWasmDefinition } from '.';
+import { IMemorySettings, IWasmDefinition } from '.';
 
 
 export function rmFolder(p: string) {
@@ -48,20 +48,6 @@ function getImportMemoryDescriptor(def: IWasmDefinition): WebAssembly.MemoryDesc
   return descriptor;
 }
 
-
-interface IMemorySettings {
-  /**
-   * Memory descriptor as derived from the wasm definition.
-   * Might be undefined in case, no memory directive was found in wasm definition.
-   * Not using any memory directive is discouraged, as it has several drawbacks:
-   * - real allocated memory at runtime is compiler dependent (undefined behavior for inwasm)
-   * - memory tends to be much bigger than really needed (runtime penalty)
-   * - memory is still exposed in exports, but not properly typed anymore 
-   */
-  descriptor?: WebAssembly.MemoryDescriptor;
-  /** Whether the memory is imported or exported. */
-  mode: 'imported' | 'exported';
-}
 
 export function extractMemorySettings(def: IWasmDefinition): IMemorySettings {
   if (def.exports.memory && def.imports?.env.memory) {

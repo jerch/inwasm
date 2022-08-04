@@ -1,11 +1,10 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { emscriptenRun, getClangBinPath } from '../sdks/emscripten';
-import { IWasmDefinition } from '..';
-import { extractMemorySettings } from '../helper';
+import { IMemorySettings, IWasmDefinition } from '..';
 
 
-export default function(def: IWasmDefinition, buildDir: string): Uint8Array {
+export default function(def: IWasmDefinition, buildDir: string, filename: string, memorySettings: IMemorySettings): Uint8Array {
   // TODO: copy additional files
   process.chdir(buildDir);
   const src = `${def.name}.c`;
@@ -18,7 +17,6 @@ export default function(def: IWasmDefinition, buildDir: string): Uint8Array {
   let switches: string[] = [];
 
   // memory settings
-  const memorySettings = extractMemorySettings(def);
   if (memorySettings.descriptor) {
     if (memorySettings.descriptor.initial !== undefined) {
       switches.push(`-Wl,--initial-memory=${memorySettings.descriptor.initial * 65536}`);

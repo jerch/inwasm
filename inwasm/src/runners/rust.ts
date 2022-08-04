@@ -1,13 +1,12 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { execSync } from 'child_process';
-import { IWasmDefinition } from '..';
+import { IMemorySettings, IWasmDefinition } from '..';
 import { APP_ROOT } from '../config';
-import { extractMemorySettings, rmFolder } from '../helper';
+import { rmFolder } from '../helper';
 
 
-export default function(def: IWasmDefinition, buildDir: string): Uint8Array {
-  // NOTE: expects to have a valid cargo installation in PATH!!
+export default function(def: IWasmDefinition, buildDir: string, filename: string, memorySettings: IMemorySettings): Uint8Array {
   const wd = process.cwd();
   execSync(`cargo version`, { shell: '/bin/bash' });
   rmFolder(buildDir);
@@ -22,7 +21,6 @@ export default function(def: IWasmDefinition, buildDir: string): Uint8Array {
   let switches: string[] = [];
 
   // memory settings
-  const memorySettings = extractMemorySettings(def);
   if (memorySettings.descriptor) {
     if (memorySettings.descriptor.initial !== undefined) {
       switches.push(`-Clink-arg=--initial-memory=${memorySettings.descriptor.initial * 65536}`);

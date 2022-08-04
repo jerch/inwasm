@@ -345,12 +345,10 @@ npm install
 
 ### TODO
 
-- better import/export handling
 - ESM support
-- better config, option to write to different file
-- individual runner config options with proper TS typing
-- better docs
 - tests, tests, tests
+- option to write to different file
+- better docs
 - windows support
 
 
