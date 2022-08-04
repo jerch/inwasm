@@ -19,7 +19,7 @@ const getAdderInstance = InWasm({
       return a + b;
     }`
 });
-const adderInstance = getAdderInstance();
+const adderInstance = getAdderInstance(); // optional argument: importObject
 
 // use the wasm instance:
 console.log(adderInstance.exports.add(23, 42));
@@ -88,15 +88,13 @@ and/or rust with wasm-bindgen.
 
 Source Types (`srctype`):
 - `'C'` - emscripten C, compiled as standalone wasm
-- `'C++'` - emscripten C++, compiled as standalone wasm
 - `'Clang-C'` - using clang from emscripten SDK
-- `'Clang-C++'` - using clang from emscripten SDK
 - `'Zig'` - preinstalled or autoinstall, compiled as freestanding
 - `'wat'` - compiled with wat2wasm
 - `'Rust'` - must be preinstalled currently with `cargo` in PATH
 - `'custom'` - any custom build script
 
-... TODO: document srctype extensions on wasm definitions ...
+... TODO: document srctype extensions on wasm definitions, C++ runners ...
 
 
 Output Types (`type`):
@@ -178,6 +176,154 @@ INWASM_ZIG_BINARY=/path/to/zig inwasm lib/*wasm.js
 ```
 
 
+### Imports / Exports
+
+Imports and exports can be directly attached to the wasm definition:
+
+```typescript
+const importObj = { env: {...} };
+InWasm({
+  // exports should be inlined for proper type inference
+  exports: {
+    exportedFunctionName: type_stub_of_function,
+    ...
+  },
+  // imports should be referenced, otherwise object is lost at runtime
+  imports: importObj
+});
+```
+Exported function names are used to populate EXPORT directives of the compiler,
+where supported (not applied for *srctype* `wat` and `custom`).
+
+Exported values are not used for anything else beside type inference by TS,
+thus only need to reflect the proper type inteface, e.g. for an exported function
+it is enough to stub a function with the right argument types and return type.
+
+Imported names are not further evaluated in the compiler runners beside a `memory`
+entry. Currently only clang exposes an interface to declare imported symbol names
+upfront (*--allow-undefined-file* switch), which is not yet applied by `inwasm`.
+Thus you have to take care yourself to match expected imports later at runtime.
+
+The `importObj` should not be declared inline, unless you provide a similarly shaped
+object at runtime by other means. (Note: every JS declaration within a wasm definition
+will be lost at runtime.)
+
+At runtime `importsObj` should be provided as argument to the getter of `IWasmInstance`
+or any manual instance creation.
+
+Note on other import/export symbol types than memory or functions - WASM furthermore
+allows types of *WebAssembly.Global* and *WebAssembly.Table* to be imported or exported.
+Your success here may vary, as some compilers dont support them equally, thus `inwasm`
+does not further deal with those.
+
+
+### Memory Settings
+
+The runtime memory of the wasm module can be configured by applying a `memory` entry either
+in `exports` (compiled as exported memory) or in `imports.env` (compiled as imported memory):
+
+- exported memory:
+  ```typescript
+  InWasm({
+    ...
+    exports: {
+      ...
+      memory: WebAssembly.Memory({initial: 1, maximum: 1}),
+      ...
+    },
+    ...
+  });
+  ```
+
+- imported memory:
+  ```typescript
+  const importObj = {
+    env: {
+      ...
+      memory: WebAssembly.Memory({initial: 1, maximum: 1}),
+      ...
+    }
+  };
+
+  InWasm({
+    ...
+    imports: importObj,
+    ...
+  });
+  ```
+
+If no memory setting was given to a wasm definition, the module will default to exported memory
+of a certain size for most compilers, unless otherwise stated by other means (e.g. an explicit memory
+import directive within the code). Most of the time this will lead to much bigger initial memory allocations
+than needed at runtime (up to several MBs depending on compiler), or even wrong maximum limits.
+Therefore it is almost always a good idea to declare the memory explicitly to keep the footprint as small
+as possible.
+
+Very small wasm functions might not need any memory at all. This edge case can occur for pure reentrant functions,
+that dont rely on any outer state (global static data), do no stack or heap interactions and handle all needed data
+through arguments and the return value. (Also note that the term "stack" might be misleading with wasm, as the stack
+is not used the same way as on other architectures, e.g. wasm-native local variables dont live on that "stack".)
+Such a no-memory mode is not directly possible with some compilers, as they assume some sort of memory being attached,
+even if unused. It still can be faked with some compilers by importing or exporting a 0-page memory,
+which should strip any memory notion from the wasm file, if it is really free of any memory access
+(double check the final wat file). Always do proper runtime checks with such an aggressive optimization.
+
+Set stack size to zero:
+- emscripten: add switch `'-s TOTAL_STACK=0'`
+- clang: add switch `'-Wl,-z,stack-size=0'`
+- zig: add switch `'--stack 0'`
+- rust: add switch `'-Clink-args="-z stack-size=0"'`
+
+Builtins for `memory.size` and `memory.grow` (useful for writing own allocator):
+- emscripten/Clang: `__builtin_wasm_memory_size(0)`, `__builtin_wasm_memory_grow(0, delta)`
+- zig: `@wasmMemorySize(0)`, `@wasmMemoryGrow(0, delta)`
+- rust: `memory_size(0)`, `memory_grow(0, delta)`
+
+where `delta` is the number of memory pages to be added and `0` the memory identifier
+(currently restricted to just one memory).
+
+
+### WASM features
+
+Due to the way `inwasm` operates your nodejs version of the build process should support any WASM feature
+used in your definitions (you can test support with the npm package *wasm-check*).
+
+If you are bound to an older node version or use cutting edge features, you can try to enable missing features
+with these node cmdline switches:
+
+- Reference types (--experimental-wasm-anyref)
+- BigInt between js and wasm (--experimental-wasm-bigint)
+- Bulk memory operations (--experimental-wasm-bulk-memory)
+- Exceptions (--experimental-wasm-eh)
+- Multi values (--experimental-wasm-mv)
+- Tail recursion calls (--experimental-wasm-return-call)
+- Saturated (non-trapping) conversions from float to int (--experimental-wasm-sat-f2i-conversions)
+- Sign/zero extensions (--experimental-wasm-se)
+- SIMD (--experimental-wasm-simd)
+- Threads (--experimental-wasm-threads)
+- Type reflection (--experimental-wasm-type-reflection)
+
+Currently the compiler runners are not yet fully prepared to apply additional wasm features correctly
+to all build steps and thus might break for certain non-default features. This will be sorted out with
+the next PRs.
+
+
+### Testing with `InWasm`
+
+`InWasm` declarations should not be used directly in mocha tests, as the needed code transformations may not
+run on import by `inwasm`, if placed inside of mocha's test suite calls like `describe` or `it`,
+thus mocha would always end up with a `must run "inwasm"` error. Also running `inwasm` on such a test file
+will create various errors for unresolved mocha defines. (This repo uses a very limited *mocha_shim*
+to overcome this, but thats not meant for general purpose testing needs.)
+
+Instead place the `InWasm` definitions into a separate module imported by the tests and run `inwasm`
+on the separate modules before calling mocha on the test files.
+
+Isolated testing and debugging of the wasm code itself is currently very limited. A future version
+may provide better support, until then use close unit/API testing on TS/JS side. Since things
+are currently really bare metal, this might even involve writing your own console logging shims.
+
+
 ### Development
 
 The source repo contains two node package folders:
@@ -200,10 +346,9 @@ npm install
 ### TODO
 
 - ESM support
-- better config, option to write to different file
-- individual runner config options with proper TS typing
-- better docs
 - tests, tests, tests
+- option to write to different file
+- better docs
 - windows support
 
 

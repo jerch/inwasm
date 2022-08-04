@@ -19,7 +19,8 @@ import clang_c from './runners/clang_c';
 import zig from './runners/zig';
 import wat from './runners/wat';
 import rust from './runners/rust';
-
+import custom from './runners/custom';
+import { extractMemorySettings } from './helper';
 
 
 console.log(green('[inwasm config]'), 'used configration:');
@@ -46,6 +47,18 @@ class InWasmReadExit extends Error { }
 
 
 /**
+ * TODO:
+ * - cmdline switch + config option for: force-recompile -force
+ * - config option for: builddir (default: PROJECT/inwasm-builds)
+ * - cmdline switch + config option for fail behavior:
+ *    - fail-hard: stop at any error with returncode != 0
+ *    - fail-soft: build as much as possible, returncode != 0
+ *    - no-fail: only report errors, returncode 0 (default in watch mode)
+ * - verbosity - silence most by default, escalate with -v, -vv etc.
+ */
+
+
+/**
  * clang specifics
  *
  * https://lld.llvm.org/WebAssembly.html
@@ -54,6 +67,7 @@ class InWasmReadExit extends Error { }
  * https://surma.dev/things/c-to-webassembly/
  * https://github.com/jedisct1/libclang_rt.builtins-wasm32.a
  * https://depth-first.com/articles/2019/10/16/compiling-c-to-webassembly-and-running-it-without-emscripten/
+ * https://aransentin.github.io/cwasm/
  *
  * __attribute__((import_module("env"), import_name("externalFunction"))) void externalFunction(void);
  * __attribute__((export_name(<name>)))
@@ -62,19 +76,13 @@ class InWasmReadExit extends Error { }
  */
 
 
-// TODO: cleanup this mess
-// TODO: investigate on assemblyscript, make|shell template
-const COMPILER_RUNNERS: {[key: string]: CompilerRunner} = {
+const COMPILER_RUNNERS: { [key: string]: CompilerRunner } = {
   'C': emscripten_c,
   'Clang-C': clang_c,
   'Zig': zig,
   'wat': wat,
   'Rust': rust,
-  'custom': (def: IWasmDefinition, buildDir: string) => {
-    if (def.customRunner)
-      return def.customRunner(def, buildDir);
-    throw new Error('no customRunner defined');
-  }
+  'custom': custom
 };
 
 
@@ -90,7 +98,7 @@ let UNITS: IWasmSourceDefinition[] = [];
       throw new InWasmReadExit('exit');
     } catch (e) {
       if (e instanceof InWasmReadExit)
-        UNITS.push({definition, stack: e.stack || ''});
+        UNITS.push({ definition, stack: e.stack || '' });
       throw e;
     }
   }
@@ -204,29 +212,47 @@ function formatBytes(bytes: number, decimals: number = 2): string {
  * expensive recompilation with SDKs bootstrapping can be avoided) --> lifts burden from `npm install`
  */
 function compileWasm(def: IWasmDefinition, filename: string): Buffer {
+  console.log(yellow('[inwasm compile]'), `Building ${filename}:${def.name}`);
   // FIXME: ensure we are at project root path
+  // get memory settings
+  const memorySettings = extractMemorySettings(def);
   // create build folders
   const baseDir = path.resolve('./inwasm-builds');
   if (!fs.existsSync(baseDir)) fs.mkdirSync(baseDir);
   const buildDir = path.join(baseDir, filename, def.name);
-  if (!fs.existsSync(buildDir)) fs.mkdirSync(buildDir, {recursive: true});
+  if (!fs.existsSync(buildDir)) fs.mkdirSync(buildDir, { recursive: true });
+  else {
+    if (!SWITCHES.force) {
+      // conditional re-compilation
+      if (fs.existsSync(path.join(buildDir, 'final.wasm')) && fs.existsSync(path.join(buildDir, 'definition'))) {
+        const oldDef = fs.readFileSync(path.join(buildDir, 'definition'), { encoding: 'utf-8' });
+        // TODO: re-enable once we have a force recompilation switch
+        if (oldDef === JSON.stringify({def, memorySettings})) {
+          console.log(green('[inwasm compile]'), `Skipping '${def.name}' (unchanged).\n`);
+          return fs.readFileSync(path.join(buildDir, 'final.wasm'));
+        }
+      }
+    }
+  }
   const wd = process.cwd();
   let result: Buffer;
   try {
-    result = Buffer.from(COMPILER_RUNNERS[def.srctype](def, buildDir));
+    result = Buffer.from(COMPILER_RUNNERS[def.srctype](def, buildDir, filename, memorySettings));
     // FIXME: abort on error...
   } finally {
     process.chdir(wd);
   }
   if (!result || !result.length) throw new Error('compile error');
-  // generate final.wasm and final.wat file in build folder
+  // generate final.wasm, final.wat and definition file in build folder
   const target = path.join(buildDir, 'final');
   fs.writeFileSync(target + '.wasm', result);
+  fs.writeFileSync(path.join(buildDir, 'definition'), JSON.stringify({def, memorySettings}));
   const wasm2wat = path.join(APP_ROOT, 'node_modules/wabt/bin/wasm2wat');
+  // FIXME: how to deal with custom features here, and in runners?
   const call = `${wasm2wat} ${target + '.wasm'} -o ${target + '.wat'}`;
   execSync(call, { shell: '/bin/bash', stdio: 'inherit' });
   console.log(green('[inwasm compile]'), `Successfully built '${def.name}' (${formatBytes(result.length)}).\n`);
-  if (result.length > 40 && def.mode === OutputMode.SYNC && def.type !== OutputType.BYTES) {
+  if (result.length > 4095 && def.mode === OutputMode.SYNC && def.type !== OutputType.BYTES) {
     console.log(yellow('[inwasm compile]'), `Warning: The generated wasm unit '${def.name}'`);
     console.log('                 will most likely not work in browser main context.\n');
   }
@@ -239,7 +265,6 @@ function compileWasm(def: IWasmDefinition, filename: string): Buffer {
  */
 function createRuntimeDefinition(wasm: Buffer, wdef: IWasmSourceDefinition): string {
   const parts: string[] = [];
-  parts.push(`e:${wdef.definition.imports || 0}`);
   parts.push(`s:${wdef.definition.mode || 0}`);
   parts.push(`t:${wdef.definition.type || 0}`);
   parts.push(`d:'${wasm.toString('base64')}'`);
@@ -343,7 +368,6 @@ const DEFAULT_GLOB = ['./**/*.wasm.js']
  * Run in watch mode.
  */
 function runWatcher(args: string[]) {
-  args.splice(args.indexOf('-w'), 1);
   const pattern = args.length ? args : DEFAULT_GLOB;
   console.log(`Starting watch mode with pattern ${pattern.join(' ')}`);
   chokidar.watch(pattern).on('all', async (event, filename) => {
@@ -360,13 +384,39 @@ function runWatcher(args: string[]) {
 }
 
 
-async function main() {
-  const args = process.argv.slice(2);
+// some cmdline switches
+const SWITCHES = {
+  watch: false,
+  force: false
+};
+
+
+function extractSwitches(args: string[]): string[] {
+  /**
+   * known switches:
+   *  -w    watch mode
+   *  -f    force recompilation
+   * more to come...
+   */
   if (args.indexOf('-w') !== -1) {
+    args.splice(args.indexOf('-w'), 1);
+    SWITCHES.watch = true;
+  }
+  if (args.indexOf('-f') !== -1) {
+    args.splice(args.indexOf('-f'), 1);
+    SWITCHES.force = true;
+  }
+  return args;
+}
+
+
+async function main() {
+  const args = extractSwitches(process.argv.slice(2));
+  if (SWITCHES.watch) {
     return runWatcher(args);
   }
   if (!args.length) {
-    return console.log(`usage: inwasm [-w] files|glob`);
+    return console.log(`usage: inwasm [-wf] files|glob`);
   }
   for (const filename of args) {
     await processFile(filename);

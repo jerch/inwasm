@@ -4,7 +4,7 @@
   "description": "wasm/emscripten with typescript and npm bundling test",
   "main": "./lib/index.js",
   "scripts": {
-    "test": "mocha lib/*.test.js",
+    "test": "inwasm lib/tests/*.wasm.js && mocha lib/tests/*.test.wasm.js",
     "tsc": "tsc",
     "watch": "tsc -w & inwasm -w 'lib/*.wasm.js' & wait",
     "start": "npm run bundle && http-server",
@@ -25,6 +25,7 @@
     "source-map-loader": "^4.0.0",
     "source-map-support": "^0.5.21",
     "typescript": "^4.7.4",
+    "wasm-check": "^2.1.2",
     "webpack": "^5.73.0",
     "webpack-cli": "^4.10.0"
   },

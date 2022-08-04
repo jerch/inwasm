@@ -32,9 +32,10 @@ export interface IWasmDefinition {
   // Sync (discouraged) vs. async wasm bootstrapping at runtime.
   mode: OutputMode,
   // Exported wasm functions, for proper TS typing simply stub them.
-  exports: { [key: string]: Function | WebAssembly.Global };
+  exports: { [key: string]: Function | WebAssembly.Global | WebAssembly.Memory };
   // Name of the env import object (must be visible at runtime). Only used for OutputType.INSTANCE.
-  imports?: string;
+  imports?: WebAssembly.Imports;
+  memoryDescriptor?: WebAssembly.MemoryDescriptor;
   // whether to treat `code` below as C or C++ source.
   srctype: 'C' | 'C++' | 'Clang-C' | 'Zig' | 'wat' | 'custom' | 'Rust';
   // custom compiler settings
@@ -89,7 +90,7 @@ export interface IWasmModule<T extends IWasmDefinition> extends WebAssemblyExten
 // extends WebAssembly.Instance with proper exports typings
 // FIXME: needs better memory story (not always exported)
 export interface IWasmInstance<T extends IWasmDefinition> extends WebAssemblyExtended.Instance {
-  exports: { memory: WebAssembly.Memory } & T['exports'];
+  exports: T['exports'];
 }
 
 // Type helper to infer wasm definition from BYTES, MODULE and INSTANCE manually.
@@ -262,7 +263,22 @@ export declare namespace WebAssemblyExtended {
 }
 
 // compiler runner
-export type CompilerRunner = (def: IWasmDefinition, buildDir: string) => Uint8Array;
+export type CompilerRunner = (def: IWasmDefinition, buildDir: string, filename: string, memorySettings: IMemorySettings) => Uint8Array;
+
+// memory settings extracted from wasm definition
+export interface IMemorySettings {
+  /**
+   * Memory descriptor as derived from the wasm definition.
+   * Might be undefined in case, no memory directive was found in wasm definition.
+   * Not using any memory directive is discouraged, as it has several drawbacks:
+   * - real allocated memory at runtime is compiler dependent (undefined behavior for inwasm)
+   * - memory tends to be much bigger than really needed (runtime penalty)
+   * - memory is still exposed in exports, but not properly typed anymore 
+   */
+  descriptor?: WebAssembly.MemoryDescriptor;
+  /** Whether the memory is imported or exported. */
+  mode: 'imported' | 'exported';
+}
 
 
 // tiny compile ctx for inwasm
@@ -279,10 +295,6 @@ function _dec(s: string): Uint8Array {
   const r = new Uint8Array(bs.length);
   for (let i = 0; i < r.length; ++i) r[i] = bs.charCodeAt(i);
   return r;
-}
-// runtime helper - set imports conditionally
-function _env(env: any): { env: any } | undefined {
-  return env ? { env: env } : undefined
 }
 
 
@@ -327,14 +339,14 @@ export function InWasm<T extends IWasmDefinitionSyncBytes>(def: T): () => IWasmB
 export function InWasm<T extends IWasmDefinitionAsyncBytes>(def: T): () => Promise<IWasmBytes<T>>;
 export function InWasm<T extends IWasmDefinitionSyncModule>(def: T): () => IWasmModule<T>;
 export function InWasm<T extends IWasmDefinitionAsyncModule>(def: T): () => Promise<IWasmModule<T>>;
-export function InWasm<T extends IWasmDefinitionSyncInstance>(def: T): () => IWasmInstance<T>;
-export function InWasm<T extends IWasmDefinitionAsyncInstance>(def: T): () => Promise<IWasmInstance<T>>;
+export function InWasm<T extends IWasmDefinitionSyncInstance>(def: T): (importObject?: WebAssembly.Imports) => IWasmInstance<T>;
+export function InWasm<T extends IWasmDefinitionAsyncInstance>(def: T): (importObject?: WebAssembly.Imports) => Promise<IWasmInstance<T>>;
 export function InWasm<T extends IWasmDefinition>(def: T): any {
   if ((def as any).d) {
     // default compiled call: wasm loading during runtime
     // for the sake of small bundling size (<900 bytes) the code is somewhat degenerated
     // see cli.ts for the meaning of the {t, s, d, e} object properties
-    const { t, s, d, e } = def as any;
+    const { t, s, d } = def as any;
     // memorize bytes and module
     let bytes: IWasmBytes<T>;
     let mod: IWasmModule<T>;
@@ -349,15 +361,11 @@ export function InWasm<T extends IWasmDefinition>(def: T): any {
         ? Promise.resolve(mod)
         : W.compile(bytes || (bytes = _dec(d))).then(m => mod = m as IWasmModule<T>);
     }
-    // FIXME: API considerations - get import from func arguments here?
-    // this has multiple benefits:
-    // - we can attach&eval import types in definition as normal object (fixes memory export glitch)
-    // - imports can be altered late before using the instance (no need to provide at compile time)
     if (s)
-      return () => new W.Instance(mod || (mod = new W.Module(bytes || (bytes = _dec(d)))), _env(e)) as IWasmInstance<T>;
-    return () => mod
-      ? W.instantiate(mod, _env(e)) as Promise<IWasmInstance<T>>
-      : W.instantiate(bytes || (bytes = _dec(d)), _env(e)).then(r => (mod = r.module) && r.instance as IWasmInstance<T>);
+      return (e?: WebAssembly.Imports) => new W.Instance(mod || (mod = new W.Module(bytes || (bytes = _dec(d)))), e) as IWasmInstance<T>;
+    return (e?: WebAssembly.Imports) => mod
+      ? W.instantiate(mod, e) as Promise<IWasmInstance<T>>
+      : W.instantiate(bytes || (bytes = _dec(d)), e).then(r => (mod = r.module) && r.instance as IWasmInstance<T>);
   }
   // invalid call: uncompiled normal run throws
   if (typeof _wasmCtx === 'undefined') throw new Error('must run "inwasm"');
