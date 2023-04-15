@@ -6,12 +6,13 @@ import { execSync } from 'child_process';
 import { IWasmDefinition, CompilerRunner, _IWasmCtx, OutputMode, OutputType } from '.';
 
 import * as chokidar from 'chokidar';
+import { globSync, hasMagic } from 'glob';
 
 import * as acorn from 'acorn';
 import * as walk from 'acorn-walk';
 
 import { green, yellow } from 'colorette';
-import { APP_ROOT, PROJECT_ROOT, CONFIG, WABT_PATH } from './config';
+import { APP_ROOT, PROJECT_ROOT, CONFIG, SHELL, isPosix, WABT_TOOL } from './config';
 
 // compiler runners
 import emscripten_c from './runners/emscripten_c';
@@ -211,7 +212,7 @@ function formatBytes(bytes: number, decimals: number = 2): string {
  * (bonus side effect: by committing the definition + final.wasm from builds folders later on,
  * expensive recompilation with SDKs bootstrapping can be avoided) --> lifts burden from `npm install`
  */
-function compileWasm(def: IWasmDefinition, filename: string): Buffer {
+async function compileWasm(def: IWasmDefinition, filename: string): Promise<Buffer> {
   console.log(yellow('[inwasm compile]'), `Building ${filename}:${def.name}`);
   // FIXME: ensure we are at project root path
   // get memory settings
@@ -237,7 +238,7 @@ function compileWasm(def: IWasmDefinition, filename: string): Buffer {
   const wd = process.cwd();
   let result: Buffer;
   try {
-    result = Buffer.from(COMPILER_RUNNERS[def.srctype](def, buildDir, filename, memorySettings));
+    result = Buffer.from(await COMPILER_RUNNERS[def.srctype](def, buildDir, filename, memorySettings));
     // FIXME: abort on error...
   } finally {
     process.chdir(wd);
@@ -247,10 +248,9 @@ function compileWasm(def: IWasmDefinition, filename: string): Buffer {
   const target = path.join(buildDir, 'final');
   fs.writeFileSync(target + '.wasm', result);
   fs.writeFileSync(path.join(buildDir, 'definition'), JSON.stringify({def, memorySettings}));
-  const wasm2wat = path.join(WABT_PATH, 'wasm2wat');
   // FIXME: how to deal with custom features here, and in runners?
-  const call = `${wasm2wat} ${target + '.wasm'} -o ${target + '.wat'}`;
-  execSync(call, { shell: '/bin/bash', stdio: 'inherit' });
+  const call = `${WABT_TOOL.wasm2wat} "${target + '.wasm'}" -o "${target + '.wat'}"`;
+  execSync(call, { shell: SHELL, stdio: 'inherit' });
   console.log(green('[inwasm compile]'), `Successfully built '${def.name}' (${formatBytes(result.length)}).\n`);
   if (result.length > 4095 && def.mode === OutputMode.SYNC && def.type !== OutputType.BYTES) {
     console.log(yellow('[inwasm compile]'), `Warning: The generated wasm unit '${def.name}'`);
@@ -341,7 +341,7 @@ async function processFile(filename: string) {
       const block = identifyDefinitionBlock(stackFrame, content);
 
       // compile & create new block
-      const wasm = compileWasm(wdef.definition, filename);
+      const wasm = await compileWasm(wdef.definition, filename);
       const blockReplace = createRuntimeDefinition(wasm, wdef);
 
       // push parts with replacement
@@ -409,7 +409,6 @@ function extractSwitches(args: string[]): string[] {
   return args;
 }
 
-
 async function main() {
   const args = extractSwitches(process.argv.slice(2));
   if (SWITCHES.watch) {
@@ -418,8 +417,19 @@ async function main() {
   if (!args.length) {
     return console.log(`usage: inwasm [-wf] files|glob`);
   }
-  for (const filename of args) {
-    await processFile(filename);
+  // minimal globbing support to work around window shell limitations
+  const files = args.length === 1 && hasMagic(args, { magicalBraces: true })
+    ? globSync(args[0])
+    : args;
+  const startTime = Date.now();
+  for (const filename of files) {
+    try {
+      await processFile(filename);
+    } catch (e) {
+      throw(e);
+    }
   }
+  console.log(green('[inwasm]'), `Finished in ${Date.now() - startTime} msec.\n`);
 }
+
 main();

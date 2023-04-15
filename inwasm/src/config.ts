@@ -1,5 +1,6 @@
 import * as path from 'path';
 import * as fs from 'fs';
+import { execSync } from 'child_process';
 
 /**
  * Whether to store compiler sdks in the project or
@@ -192,3 +193,38 @@ function getWabtPath(): string {
   return path.join(PROJECT_ROOT, 'node_modules', 'wabt', 'bin');
 }
 export const WABT_PATH = getWabtPath();
+
+// shell to be executed
+export const SHELL = process.platform === 'win32' ? 'cmd.exe' : execSync('which bash', {encoding: 'utf-8'}).trim();
+
+// simply assume any OS != windows being POSIX compatible
+export const isPosix = process.platform !== 'win32';
+
+interface IWabtToolPath {
+  'wasm2c': string;
+  'wasm-decompile': string;
+  'wasm-objdump': string;
+  'wasm-strip': string;
+  'wat2wasm': string;
+  'wasm2wat': string;
+  'wasm-interp': string;
+  'wasm-opcodecnt': string;
+  'wasm-validate': string;
+}
+
+// wabt tool path abstraction
+function getWabtTool(): IWabtToolPath {
+  const p = (name: string) => `"${process.execPath}" "${path.join(getWabtPath(), name)}"`;
+  return {
+    'wasm2c': p('wasm2c'),
+    'wasm-decompile': p('wasm-decompile'),
+    'wasm-objdump': p('wasm-objdump'),
+    'wasm-strip': p('wasm-strip'),
+    'wat2wasm': p('wat2wasm'),
+    'wasm2wat': p('wasm2wat'),
+    'wasm-interp': p('wasm-interp'),
+    'wasm-opcodecnt': p('wasm-opcodecnt'),
+    'wasm-validate': p('wasm-validate')
+  };
+}
+export const WABT_TOOL = getWabtTool();

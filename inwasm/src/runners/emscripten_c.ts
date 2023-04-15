@@ -1,6 +1,8 @@
 import * as fs from 'fs';
-import { emscriptenRun } from '../sdks/emscripten';
+import * as path from 'path';
+import { emscriptenRun, getEmscriptenPath } from '../sdks/emscripten';
 import { IMemorySettings, IWasmDefinition } from '..';
+import { isPosix } from '../config';
 
 
 export default function(def: IWasmDefinition, buildDir: string, filename: string, memorySettings: IMemorySettings): Uint8Array {
@@ -15,7 +17,7 @@ export default function(def: IWasmDefinition, buildDir: string, filename: string
     .map(el => `-D${el[0]}=${el[1]}`).join(' ');
   const _funcs = Object.entries(def.exports)
     .filter(el => typeof el[1] === 'function')
-    .map(el => `"_${el[0]}"`)
+    .map(el => `_${el[0]}`)
     .join(',');
   let switches: string[] = [];
   
@@ -43,8 +45,10 @@ export default function(def: IWasmDefinition, buildDir: string, filename: string
   // FIXME:
   switches.push(...['-s ERROR_ON_UNDEFINED_SYMBOLS=0', '-s WARN_ON_UNDEFINED_SYMBOLS=0']);
 
-  const funcs = `-s EXPORTED_FUNCTIONS='[${_funcs}]'`;
-  const call = `emcc ${opt} ${defines} ${funcs} ${switches.join(' ')} --no-entry ${src} -o ${target}`;
+  const funcs = `-s EXPORTED_FUNCTIONS=${_funcs}`;
+  // FIXME: for unknown reason windows shell cannot find emcc, thus give path explicitly
+  const bin = isPosix ? 'emcc' : path.join(getEmscriptenPath(), 'upstream', 'emscripten', 'emcc.bat');
+  const call = `${bin} ${opt} ${defines} ${funcs} ${switches.join(' ')} --no-entry ${src} -o ${target}`;
   emscriptenRun(call);
   return fs.readFileSync(target);
 }

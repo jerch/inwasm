@@ -263,7 +263,7 @@ export declare namespace WebAssemblyExtended {
 }
 
 // compiler runner
-export type CompilerRunner = (def: IWasmDefinition, buildDir: string, filename: string, memorySettings: IMemorySettings) => Uint8Array;
+export type CompilerRunner = (def: IWasmDefinition, buildDir: string, filename: string, memorySettings: IMemorySettings) => Uint8Array | Promise<Uint8Array>;
 
 // memory settings extracted from wasm definition
 export interface IMemorySettings {

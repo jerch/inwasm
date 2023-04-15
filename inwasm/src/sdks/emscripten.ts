@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as cp from 'child_process';
 import { rmFolder } from '../helper';
 
-import { APP_ROOT, PROJECT_ROOT, CONFIG } from '../config';
+import { APP_ROOT, PROJECT_ROOT, CONFIG, SHELL, isPosix } from '../config';
 
 
 /**
@@ -30,11 +30,11 @@ export function getEmscriptenPath(): string {
   // install
   fs.mkdirSync(path.dirname(basePath), { recursive: true });
   console.log(`\n[emscripten.checkout] Cloning emscripten...`);
-  cp.execSync(`git clone https://github.com/emscripten-core/emsdk.git ${basePath}`, {shell: '/bin/bash', stdio: 'inherit'});
+  cp.execSync(`git clone https://github.com/emscripten-core/emsdk.git ${basePath}`, {shell: SHELL, stdio: 'inherit'});
   console.log(`\n[emscripten.version] Activate version: "${emsdkConf.version}"`);
   cp.execSync(
     `${basePath}/emsdk install ${emsdkConf.version} && ${basePath}/emsdk activate ${emsdkConf.version}`,
-    {shell: '/bin/bash', stdio: 'inherit'}
+    {shell: SHELL, stdio: 'inherit'}
   );
 
   return basePath;
@@ -59,6 +59,8 @@ export function getClangBinPath(): string {
 export function emscriptenRun(cmd: string) {
   const sdkPath = getEmscriptenPath();
   console.log(`\n[emscripten.run] ${cmd}`);
-  const sdk = `source ${sdkPath}/emsdk_env.sh > /dev/null 2>&1`;
-  cp.execSync(`${sdk} && ${cmd}`, {shell: '/bin/bash', stdio: 'inherit'});
+  const sdk = isPosix
+    ? `source ${path.join(sdkPath, 'emsdk_env.sh')} > /dev/null 2>&1`
+    : `${path.join(sdkPath, 'emsdk_env.bat')} >nul 2>&1`;
+  cp.execSync(`${sdk} && ${cmd}`, {shell: SHELL, stdio: 'inherit'});
 }
