@@ -64,13 +64,19 @@ function getUsableVersions(): any {
 
 
 function downloadAndUnpack(basePath: string, version: IDownloadVersion, versionString: string) {
-  const tarball = path.join(basePath, 'sdk.xz');
+  console.log('grrrrr - would download again...');
+  //return;
+  const tarball = path.join(basePath, 'sdk.zip');
+  console.log(version);
   console.log(`[zig.run] Installing Zig "${versionString}"...`);
-  cp.execSync(`curl --progress-bar -o ${tarball} ${version.tarball}`, { shell: '/bin/bash', stdio: 'inherit' });
-  const shasum = cp.execSync(`shasum -a 256 ${tarball}`, { encoding: 'utf-8' });
-  if (!shasum.includes(version.shasum)) throw new Error('download error - shasum does not match');
-  cp.execSync(`tar -xf ${tarball} -C ${basePath}`);
-  fs.unlinkSync(tarball);
+  //cp.execSync(`curl --progress-bar -o ${tarball} ${version.tarball}`, { shell: 'cmd.exe', stdio: 'inherit' });
+  //const shasum = cp.execSync(`shasum -a 256 ${tarball}`, { encoding: 'utf-8' });
+  //if (!shasum.includes(version.shasum)) throw new Error('download error - shasum does not match');
+  //cp.execSync(`tar -xf ${tarball} -C ${basePath}`);
+  //TODO: place unzip here...
+  cp.execSync(`c:\\Users\\jerch\\Desktop\\inwasm\\inwasm\\inwasm\\unzip ${tarball} -d ${basePath}`, { stdio: 'ignore' })
+  return;
+  //fs.unlinkSync(tarball);
   const subfolder = fs.readdirSync(basePath)[0];
   fs.symlinkSync(path.join(basePath, subfolder, 'zig'), path.join(basePath, 'zig'));
   console.log(`[zig.run] Finished.\n`);
@@ -100,7 +106,7 @@ export function getZigBinary(): string {
   // from autoinstalled
   const basePath = path.join(zigConf.store === 'inwasm' ? APP_ROOT : PROJECT_ROOT, 'inwasm-sdks', 'zig');
   if (fs.existsSync(basePath) && fs.existsSync(path.join(basePath, 'zig'))) {
-    const installed = cp.execSync(`${path.join(basePath, 'zig')} version`, { encoding: 'utf-8' }).trim();
+    const installed = cp.execSync(`${path.join(basePath, 'zig\\zig.exe')} version`, { encoding: 'utf-8' }).trim();
     if (version.tarball.indexOf(installed) !== -1) {
       return path.join(basePath, 'zig');
     }

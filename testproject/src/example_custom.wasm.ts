@@ -9,7 +9,8 @@ export const custom = InWasm({
   customRunner: (def, buildDir) => {
     const cp = require('child_process');
     const fs = require('fs');
-    cp.execSync('cd custom && ./build.sh', { shell: '/bin/bash', stdio: 'inherit' });
+    //cp.execSync('cd custom && ./build.sh', { shell: '/bin/bash', stdio: 'inherit' });
+    cp.execSync('cd custom && build.bat', { shell: 'cmd.exe', stdio: 'inherit' });
     return fs.readFileSync('custom/module.wasm');
   },
   exports: {

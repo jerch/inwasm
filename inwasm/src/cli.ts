@@ -249,8 +249,11 @@ function compileWasm(def: IWasmDefinition, filename: string): Buffer {
   fs.writeFileSync(path.join(buildDir, 'definition'), JSON.stringify({def, memorySettings}));
   const wasm2wat = path.join(WABT_PATH, 'wasm2wat');
   // FIXME: how to deal with custom features here, and in runners?
-  const call = `${wasm2wat} ${target + '.wasm'} -o ${target + '.wat'}`;
-  execSync(call, { shell: '/bin/bash', stdio: 'inherit' });
+  const grr = process.cwd();
+  process.chdir(buildDir);
+  const call = `node ${wasm2wat} ${'final.wasm'} -o ${'final.wat'}`;
+  execSync(call, { shell: 'cmd.exe', stdio: 'inherit' });
+  process.chdir(grr);
   console.log(green('[inwasm compile]'), `Successfully built '${def.name}' (${formatBytes(result.length)}).\n`);
   if (result.length > 4095 && def.mode === OutputMode.SYNC && def.type !== OutputType.BYTES) {
     console.log(yellow('[inwasm compile]'), `Warning: The generated wasm unit '${def.name}'`);
@@ -409,6 +412,7 @@ function extractSwitches(args: string[]): string[] {
   return args;
 }
 
+import { globSync, hasMagic } from 'glob';
 
 async function main() {
   const args = extractSwitches(process.argv.slice(2));
@@ -418,7 +422,10 @@ async function main() {
   if (!args.length) {
     return console.log(`usage: inwasm [-wf] files|glob`);
   }
-  for (const filename of args) {
+  const files = args.length === 1 && hasMagic(args, { magicalBraces: true })
+    ? globSync(args[0])
+    : args;
+  for (const filename of files) {
     await processFile(filename);
   }
 }

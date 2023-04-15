@@ -13,7 +13,7 @@ export default function(def: IWasmDefinition, buildDir: string, filename: string
   fs.writeFileSync(src, def.code);
   const wat2wasm = path.join(WABT_PATH, 'wat2wasm');
   const wasmStrip = path.join(WABT_PATH, 'wasm-strip');
-  const call = `${wat2wasm} ${src} && ${wasmStrip} ${target}`;
-  execSync(call, { shell: '/bin/bash', stdio: 'inherit' });
+  const call = `node ${wat2wasm} ${src} && node ${wasmStrip} ${target}`;
+  execSync(call, { shell: 'cmd.exe', stdio: 'inherit' });
   return fs.readFileSync(target);
 }

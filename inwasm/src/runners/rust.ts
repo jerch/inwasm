@@ -8,13 +8,13 @@ import { rmFolder } from '../helper';
 
 export default function(def: IWasmDefinition, buildDir: string, filename: string, memorySettings: IMemorySettings): Uint8Array {
   const wd = process.cwd();
-  execSync(`cargo version`, { shell: '/bin/bash' });
+  execSync(`cargo version`, { shell: 'cmd.exe' });
   rmFolder(buildDir);
   process.chdir(path.dirname(buildDir));
   const src = path.join(buildDir, 'src', 'lib.rs');
   const target = path.join(buildDir, 'target', 'wasm32-unknown-unknown', 'release', `${def.name}.wasm`);
   console.log(`\n[rust.run] cargo new ${def.name} --lib`);
-  execSync(`cargo new ${def.name} --lib`, { shell: '/bin/bash', stdio: 'inherit' });
+  execSync(`cargo new ${def.name} --lib`, { shell: 'cmd.exe', stdio: 'inherit' });
   process.chdir(buildDir);
   fs.writeFileSync(src, def.code);
   fs.appendFileSync('Cargo.toml', '\n[lib]\ncrate-type = ["cdylib"]\n[profile.release]\nlto = true\n');
@@ -42,9 +42,9 @@ export default function(def: IWasmDefinition, buildDir: string, filename: string
   //execSync(`cargo build --target wasm32-unknown-unknown --release`, { shell: '/bin/bash', stdio: 'inherit' });
   const call = `cargo rustc --target wasm32-unknown-unknown --release -- ${switches.join(' ')}`;
   console.log(`\n[rust.run] ${call}`);
-  execSync(call, { shell: '/bin/bash', stdio: 'inherit' });
+  execSync(call, { shell: 'cmd.exe', stdio: 'inherit' });
   const wasmStrip = path.join(WABT_PATH, 'wasm-strip');
-  console.log(`\n[rust.run] ${wasmStrip} ${target}`);
-  execSync(`${wasmStrip} ${target}`, { shell: '/bin/bash', stdio: 'inherit' });
+  //console.log(`\n[rust.run] ${wasmStrip} ${target}`);
+  //execSync(`node ${wasmStrip} ${target}`, { shell: 'cmd.exe', stdio: 'inherit' });
   return fs.readFileSync(target);
 }

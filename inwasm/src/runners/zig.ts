@@ -37,12 +37,12 @@ export default function(def: IWasmDefinition, buildDir: string, filename: string
     switches.push(...def.compile.switches);
   }
 
-  const zig = getZigBinary();
+  const zig = getZigBinary() + '\\zig.exe';
   const call = `${zig} build-lib ${src} -target wasm32-freestanding -dynamic -O ReleaseFast ${ff} ${switches.join(' ')}`;
   console.log(`\n[zig.run] ${call}`);
-  execSync(call, { shell: '/bin/bash', stdio: 'inherit' });
+  execSync(call, { shell: 'cmd.exe', stdio: 'inherit' });
   const wasmStrip = path.join(WABT_PATH, 'wasm-strip');
   console.log(`\n[zig.run] ${wasmStrip} ${target}`);
-  execSync(`${wasmStrip} ${target}`, { shell: '/bin/bash', stdio: 'inherit' });
+  execSync(`node ${wasmStrip} ${target}`, { shell: 'cmd.exe', stdio: 'inherit' });
   return fs.readFileSync(target);
 }
