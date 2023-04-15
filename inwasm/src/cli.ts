@@ -212,7 +212,7 @@ function formatBytes(bytes: number, decimals: number = 2): string {
  * (bonus side effect: by committing the definition + final.wasm from builds folders later on,
  * expensive recompilation with SDKs bootstrapping can be avoided) --> lifts burden from `npm install`
  */
-function compileWasm(def: IWasmDefinition, filename: string): Buffer {
+async function compileWasm(def: IWasmDefinition, filename: string): Promise<Buffer> {
   console.log(yellow('[inwasm compile]'), `Building ${filename}:${def.name}`);
   // FIXME: ensure we are at project root path
   // get memory settings
@@ -238,7 +238,7 @@ function compileWasm(def: IWasmDefinition, filename: string): Buffer {
   const wd = process.cwd();
   let result: Buffer;
   try {
-    result = Buffer.from(COMPILER_RUNNERS[def.srctype](def, buildDir, filename, memorySettings));
+    result = Buffer.from(await COMPILER_RUNNERS[def.srctype](def, buildDir, filename, memorySettings));
     // FIXME: abort on error...
   } finally {
     process.chdir(wd);
@@ -350,7 +350,7 @@ async function processFile(filename: string) {
       const block = identifyDefinitionBlock(stackFrame, content);
 
       // compile & create new block
-      const wasm = compileWasm(wdef.definition, filename);
+      const wasm = await compileWasm(wdef.definition, filename);
       const blockReplace = createRuntimeDefinition(wasm, wdef);
 
       // push parts with replacement
