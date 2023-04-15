@@ -6,6 +6,7 @@ import { execSync } from 'child_process';
 import { IWasmDefinition, CompilerRunner, _IWasmCtx, OutputMode, OutputType } from '.';
 
 import * as chokidar from 'chokidar';
+import { globSync, hasMagic } from 'glob';
 
 import * as acorn from 'acorn';
 import * as walk from 'acorn-walk';
@@ -412,8 +413,6 @@ function extractSwitches(args: string[]): string[] {
   return args;
 }
 
-import { globSync, hasMagic } from 'glob';
-
 async function main() {
   const args = extractSwitches(process.argv.slice(2));
   if (SWITCHES.watch) {
@@ -422,6 +421,7 @@ async function main() {
   if (!args.length) {
     return console.log(`usage: inwasm [-wf] files|glob`);
   }
+  // minimal globbing support to work around window shell limitations
   const files = args.length === 1 && hasMagic(args, { magicalBraces: true })
     ? globSync(args[0])
     : args;
@@ -429,4 +429,5 @@ async function main() {
     await processFile(filename);
   }
 }
+
 main();
