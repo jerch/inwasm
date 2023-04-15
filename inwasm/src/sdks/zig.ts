@@ -1,8 +1,14 @@
-import { APP_ROOT, PROJECT_ROOT, CONFIG, isPosix } from '../config';
+import { APP_ROOT, PROJECT_ROOT, CONFIG, isPosix, SHELL } from '../config';
 import * as cp from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 import { rmFolder } from '../helper';
+import { createHash } from 'crypto';
+
+
+function sha256(content: Buffer) {  
+  return createHash('sha256').update(content).digest('hex');
+}
 
 
 interface IDownloadVersion {
@@ -64,37 +70,29 @@ function getUsableVersions(): any {
 
 
 function downloadAndUnpack(basePath: string, version: IDownloadVersion, versionString: string) {
-  // FIXME: totally messed up atm. needs unified sdk handling for zig
+  const tarball = path.join(basePath, 'sdk.xz');
+  console.log(`[zig.run] Installing Zig "${versionString}"...`);
+  cp.execSync(`curl --progress-bar -o ${tarball} ${version.tarball}`, { shell: SHELL, stdio: 'inherit' });
+  if (sha256(fs.readFileSync(tarball)) !== version.shasum) throw new Error('download error - shasum does not match');
   if (isPosix) {
-    const tarball = path.join(basePath, 'sdk.xz');
-    console.log(`[zig.run] Installing Zig "${versionString}"...`);
-    cp.execSync(`curl --progress-bar -o ${tarball} ${version.tarball}`, { shell: '/bin/bash', stdio: 'inherit' });
-    const shasum = cp.execSync(`shasum -a 256 ${tarball}`, { encoding: 'utf-8' });
-    if (!shasum.includes(version.shasum)) throw new Error('download error - shasum does not match');
     cp.execSync(`tar -xf ${tarball} -C ${basePath}`);
-    fs.unlinkSync(tarball);
-    const subfolder = fs.readdirSync(basePath)[0];
-    fs.symlinkSync(path.join(basePath, subfolder, 'zig'), path.join(basePath, 'zig'));
-    console.log(`[zig.run] Finished.\n`);
   } else {
-    // FIXME: not working yet properly, might need other unzip shim?
-    console.log('grrrrr - would download again...');
-    //return;
-    const tarball = path.join(basePath, 'sdk.zip');
-    console.log(version);
-    console.log(`[zig.run] Installing Zig "${versionString}"...`);
-    //cp.execSync(`curl --progress-bar -o ${tarball} ${version.tarball}`, { shell: SHELL, stdio: 'inherit' });
-    //const shasum = cp.execSync(`shasum -a 256 ${tarball}`, { encoding: 'utf-8' });
-    //if (!shasum.includes(version.shasum)) throw new Error('download error - shasum does not match');
-    //cp.execSync(`tar -xf ${tarball} -C ${basePath}`);
-    //TODO: place unzip here...
-    cp.execSync(`c:\\Users\\jerch\\Desktop\\inwasm\\inwasm\\inwasm\\unzip ${tarball} -d ${basePath}`, { stdio: 'ignore' })
-    return;
-    //fs.unlinkSync(tarball);
-    const subfolder = fs.readdirSync(basePath)[0];
-    fs.symlinkSync(path.join(basePath, subfolder, 'zig'), path.join(basePath, 'zig'));
-    console.log(`[zig.run] Finished.\n`);
+    // FIXME: still awkward shell error?
+    cp.execSync(`${path.join(APP_ROOT, 'exe', 'unzip.exe')} ${tarball} -d ${basePath}`);
   }
+  fs.unlinkSync(tarball);
+  const subfolder = fs.readdirSync(basePath)[0];
+  if (isPosix) {
+    fs.symlinkSync(path.join(basePath, subfolder, 'zig'), path.join(basePath, 'zig'));
+  } else {
+    fs.symlinkSync(path.join(basePath, subfolder), path.join(basePath, 'current'));
+  }
+  console.log(`[zig.run] Finished.\n`);
+}
+
+
+function localZigBinary(basePath: string): string {
+  return isPosix ? path.join(basePath, 'zig') : path.join(basePath, 'current', 'zig.exe');
 }
 
 
@@ -120,13 +118,11 @@ export function getZigBinary(): string {
 
   // from autoinstalled
   const basePath = path.join(zigConf.store === 'inwasm' ? APP_ROOT : PROJECT_ROOT, 'inwasm-sdks', 'zig');
-  if (fs.existsSync(basePath) && fs.existsSync(path.join(basePath, 'zig'))) {
-    const installed = isPosix
-      ? cp.execSync(`${path.join(basePath, 'zig')} version`, { encoding: 'utf-8' }).trim()
-      // FIXME: bad hack, needs proper solution from above
-      : cp.execSync(`${path.join(basePath, 'zig\\zig.exe')} version`, { encoding: 'utf-8' }).trim();
+  const localZig = localZigBinary(basePath);
+  if (fs.existsSync(basePath) && fs.existsSync(localZig)) {
+    const installed = cp.execSync(`${localZig} version`, { encoding: 'utf-8' }).trim();
     if (version.tarball.indexOf(installed) !== -1) {
-      return path.join(basePath, 'zig');
+      return localZig;
     }
     console.log(`[zig.run] Resolving version change "${installed}" --> "${zigConf.version}"`);
   }
@@ -135,9 +131,8 @@ export function getZigBinary(): string {
   // install
   fs.mkdirSync(basePath, { recursive: true });
   downloadAndUnpack(basePath, version, zigConf.version);
-  if (fs.existsSync(path.join(basePath, 'zig'))) {
-    return path.join(basePath, 'zig');
+  if (fs.existsSync(localZig)) {
+    return localZig;
   }
   throw new Error('cannot find zig binary');
 }
-
