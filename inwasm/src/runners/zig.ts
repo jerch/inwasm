@@ -40,6 +40,6 @@ export default function(def: IWasmDefinition, buildDir: string, filename: string
   console.log(`\n[zig.run] ${call}`);
   execSync(call, { shell: SHELL, stdio: 'inherit' });
   console.log(`\n[zig.run] wasm-strip ${target}`);
-  execSync(`${WABT_TOOL['wasm-strip']} ${target}`, { shell: SHELL, stdio: 'inherit' });
+  execSync(`${WABT_TOOL['wasm-strip']} "${target}"`, { shell: SHELL, stdio: 'inherit' });
   return fs.readFileSync(target);
 }

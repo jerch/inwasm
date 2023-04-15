@@ -70,15 +70,14 @@ function getUsableVersions(): any {
 
 
 function downloadAndUnpack(basePath: string, version: IDownloadVersion, versionString: string) {
-  const tarball = path.join(basePath, 'sdk.xz');
+  const tarball = path.join(basePath, isPosix ? 'sdk.xz' : 'sdk.zip');
   console.log(`[zig.run] Installing Zig "${versionString}"...`);
   cp.execSync(`curl --progress-bar -o ${tarball} ${version.tarball}`, { shell: SHELL, stdio: 'inherit' });
   if (sha256(fs.readFileSync(tarball)) !== version.shasum) throw new Error('download error - shasum does not match');
   if (isPosix) {
     cp.execSync(`tar -xf ${tarball} -C ${basePath}`);
   } else {
-    // FIXME: still awkward shell error?
-    cp.execSync(`${path.join(APP_ROOT, 'exe', 'unzip.exe')} ${tarball} -d ${basePath}`);
+    cp.execSync(`${path.join(APP_ROOT, 'exe', 'unzip.exe')} "${tarball}" -d "${basePath}"`, { stdio: 'ignore' });
   }
   fs.unlinkSync(tarball);
   const subfolder = fs.readdirSync(basePath)[0];

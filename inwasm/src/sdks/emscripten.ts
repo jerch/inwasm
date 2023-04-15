@@ -59,12 +59,8 @@ export function getClangBinPath(): string {
 export function emscriptenRun(cmd: string) {
   const sdkPath = getEmscriptenPath();
   console.log(`\n[emscripten.run] ${cmd}`);
-  if (isPosix) {
-    const sdk = `source ${sdkPath}/emsdk_env.sh > /dev/null 2>&1`;
-    cp.execSync(`${sdk} && ${cmd}`, {shell: SHELL, stdio: 'inherit'});
-  } else {
-    // FIXME: something is messed up here - emcc is not in path?
-    const sdk = path.join(sdkPath, 'emsdk_env.bat');
-    cp.execSync(`${sdk} && ${cmd}`, {shell: SHELL, stdio: 'inherit'});
-  }
+  const sdk = isPosix
+    ? `source ${path.join(sdkPath, 'emsdk_env.sh')} > /dev/null 2>&1`
+    : `path.join(sdkPath, 'emsdk_env.bat') >nul 2>&1`;
+  cp.execSync(`${sdk} && ${cmd}`, {shell: SHELL, stdio: 'inherit'});
 }

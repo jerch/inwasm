@@ -43,10 +43,7 @@ export default function(def: IWasmDefinition, buildDir: string, filename: string
   const call = `cargo rustc --target wasm32-unknown-unknown --release -- ${switches.join(' ')}`;
   console.log(`\n[rust.run] ${call}`);
   execSync(call, { shell: SHELL, stdio: 'inherit' });
-  if (isPosix) {
-    // FIXME: workdir issue with wasm-strip under windows
-    console.log(`\n[rust.run] wasm-strip ${target}`);
-    execSync(`${WABT_TOOL['wasm-strip']} ${target}`, { shell: SHELL, stdio: 'inherit' });
-  }
+  console.log(`\n[rust.run] wasm-strip ${target}`);
+  execSync(`${WABT_TOOL['wasm-strip']} "${target}"`, { shell: SHELL, stdio: 'inherit' });
   return fs.readFileSync(target);
 }

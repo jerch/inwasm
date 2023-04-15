@@ -249,17 +249,8 @@ async function compileWasm(def: IWasmDefinition, filename: string): Promise<Buff
   fs.writeFileSync(target + '.wasm', result);
   fs.writeFileSync(path.join(buildDir, 'definition'), JSON.stringify({def, memorySettings}));
   // FIXME: how to deal with custom features here, and in runners?
-  if (isPosix) {
-    const call = `${WABT_TOOL.wasm2wat} ${target + '.wasm'} -o ${target + '.wat'}`;
-    execSync(call, { shell: SHELL, stdio: 'inherit' });
-  } else {
-    // FIXME: dang it - why does wasm2wat only work within workdir under windows? shell issue?
-    const grr = process.cwd();
-    process.chdir(buildDir);
-    const call = `${WABT_TOOL.wasm2wat} ${'final.wasm'} -o ${'final.wat'}`;
-    execSync(call, { shell: SHELL, stdio: 'inherit' });
-    process.chdir(grr);
-  }
+  const call = `${WABT_TOOL.wasm2wat} "${target + '.wasm'}" -o "${target + '.wat'}"`;
+  execSync(call, { shell: SHELL, stdio: 'inherit' });
   console.log(green('[inwasm compile]'), `Successfully built '${def.name}' (${formatBytes(result.length)}).\n`);
   if (result.length > 4095 && def.mode === OutputMode.SYNC && def.type !== OutputType.BYTES) {
     console.log(yellow('[inwasm compile]'), `Warning: The generated wasm unit '${def.name}'`);
@@ -430,9 +421,15 @@ async function main() {
   const files = args.length === 1 && hasMagic(args, { magicalBraces: true })
     ? globSync(args[0])
     : args;
+  const startTime = Date.now();
   for (const filename of files) {
-    await processFile(filename);
+    try {
+      await processFile(filename);
+    } catch (e) {
+      throw(e);
+    }
   }
+  console.log(green('[inwasm]'), `Finished in ${Date.now() - startTime} msec.\n`);
 }
 
 main();

@@ -1,5 +1,6 @@
 import * as fs from 'fs';
-import { emscriptenRun } from '../sdks/emscripten';
+import * as path from 'path';
+import { emscriptenRun, getEmscriptenPath } from '../sdks/emscripten';
 import { IMemorySettings, IWasmDefinition } from '..';
 import { isPosix } from '../config';
 
@@ -45,8 +46,8 @@ export default function(def: IWasmDefinition, buildDir: string, filename: string
   switches.push(...['-s ERROR_ON_UNDEFINED_SYMBOLS=0', '-s WARN_ON_UNDEFINED_SYMBOLS=0']);
 
   const funcs = `-s EXPORTED_FUNCTIONS=${_funcs}`;
-  // FIXME: windows shell does not find emcc here
-  const bin = isPosix ? 'emcc' : 'c:\\Users\\jerch\\Desktop\\inwasm\\inwasm\\testproject\\inwasm-sdks\\emsdk\\upstream\\emscripten\\emcc.bat';
+  // FIXME: for unknown reason windows shell cannot find emcc, thus give path explicitly
+  const bin = isPosix ? 'emcc' : path.join(getEmscriptenPath(), 'upstream', 'emscripten', 'emcc.bat');
   const call = `${bin} ${opt} ${defines} ${funcs} ${switches.join(' ')} --no-entry ${src} -o ${target}`;
   emscriptenRun(call);
   return fs.readFileSync(target);

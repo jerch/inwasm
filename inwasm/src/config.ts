@@ -214,7 +214,7 @@ interface IWabtToolPath {
 
 // wabt tool path abstraction
 function getWabtTool(): IWabtToolPath {
-  const p = (name: string) => `${process.execPath} ${path.join(getWabtPath(), name)}`;
+  const p = (name: string) => `"${process.execPath}" "${path.join(getWabtPath(), name)}"`;
   return {
     'wasm2c': p('wasm2c'),
     'wasm-decompile': p('wasm-decompile'),
