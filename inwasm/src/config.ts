@@ -194,10 +194,7 @@ function getWabtPath(): string {
 export const WABT_PATH = getWabtPath();
 
 // shell to be executed
-// FIXME:
-// - Can we resort to /bin/sh?
-// - bash also needs fix under non default installations (e.g. FreeBSD)
-export const SHELL = process.platform === 'win32' ? 'cmd.exe' : '/bin/bash';
+export const SHELL = process.platform === 'win32' ? 'cmd.exe' : '/bin/sh';
 
 // simply assume any OS != windows being POSIX compatible
 export const isPosix = process.platform !== 'win32';
