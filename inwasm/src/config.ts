@@ -1,5 +1,6 @@
 import * as path from 'path';
 import * as fs from 'fs';
+import { execSync } from 'child_process';
 
 /**
  * Whether to store compiler sdks in the project or
@@ -194,7 +195,7 @@ function getWabtPath(): string {
 export const WABT_PATH = getWabtPath();
 
 // shell to be executed
-export const SHELL = process.platform === 'win32' ? 'cmd.exe' : '/bin/sh';
+export const SHELL = process.platform === 'win32' ? 'cmd.exe' : execSync('which bash', {encoding: 'utf-8'}).trim();
 
 // simply assume any OS != windows being POSIX compatible
 export const isPosix = process.platform !== 'win32';
