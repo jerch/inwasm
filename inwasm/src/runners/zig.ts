@@ -1,9 +1,8 @@
 import * as fs from 'fs';
-import * as path from 'path';
 import { execSync } from 'child_process';
 import { getZigBinary } from '../sdks/zig';
 import { IMemorySettings, IWasmDefinition } from '..';
-import { APP_ROOT, WABT_PATH } from '../config';
+import { SHELL, WABT_TOOL } from '../config';
 
 
 export default function(def: IWasmDefinition, buildDir: string, filename: string, memorySettings: IMemorySettings): Uint8Array {
@@ -37,12 +36,10 @@ export default function(def: IWasmDefinition, buildDir: string, filename: string
     switches.push(...def.compile.switches);
   }
 
-  const zig = getZigBinary() + '\\zig.exe';
-  const call = `${zig} build-lib ${src} -target wasm32-freestanding -dynamic -O ReleaseFast ${ff} ${switches.join(' ')}`;
+  const call = `${getZigBinary()} build-lib ${src} -target wasm32-freestanding -dynamic -O ReleaseFast ${ff} ${switches.join(' ')}`;
   console.log(`\n[zig.run] ${call}`);
-  execSync(call, { shell: 'cmd.exe', stdio: 'inherit' });
-  const wasmStrip = path.join(WABT_PATH, 'wasm-strip');
-  console.log(`\n[zig.run] ${wasmStrip} ${target}`);
-  execSync(`node ${wasmStrip} ${target}`, { shell: 'cmd.exe', stdio: 'inherit' });
+  execSync(call, { shell: SHELL, stdio: 'inherit' });
+  console.log(`\n[zig.run] wasm-strip ${target}`);
+  execSync(`${WABT_TOOL['wasm-strip']} ${target}`, { shell: SHELL, stdio: 'inherit' });
   return fs.readFileSync(target);
 }

@@ -12,7 +12,7 @@ import * as acorn from 'acorn';
 import * as walk from 'acorn-walk';
 
 import { green, yellow } from 'colorette';
-import { APP_ROOT, PROJECT_ROOT, CONFIG, WABT_PATH } from './config';
+import { APP_ROOT, PROJECT_ROOT, CONFIG, SHELL, isPosix, WABT_TOOL } from './config';
 
 // compiler runners
 import emscripten_c from './runners/emscripten_c';
@@ -248,13 +248,18 @@ function compileWasm(def: IWasmDefinition, filename: string): Buffer {
   const target = path.join(buildDir, 'final');
   fs.writeFileSync(target + '.wasm', result);
   fs.writeFileSync(path.join(buildDir, 'definition'), JSON.stringify({def, memorySettings}));
-  const wasm2wat = path.join(WABT_PATH, 'wasm2wat');
   // FIXME: how to deal with custom features here, and in runners?
-  const grr = process.cwd();
-  process.chdir(buildDir);
-  const call = `node ${wasm2wat} ${'final.wasm'} -o ${'final.wat'}`;
-  execSync(call, { shell: 'cmd.exe', stdio: 'inherit' });
-  process.chdir(grr);
+  if (isPosix) {
+    const call = `${WABT_TOOL.wasm2wat} ${target + '.wasm'} -o ${target + '.wat'}`;
+    execSync(call, { shell: SHELL, stdio: 'inherit' });
+  } else {
+    // FIXME: dang it - why does wasm2wat only work within workdir under windows? shell issue?
+    const grr = process.cwd();
+    process.chdir(buildDir);
+    const call = `${WABT_TOOL.wasm2wat} ${'final.wasm'} -o ${'final.wat'}`;
+    execSync(call, { shell: SHELL, stdio: 'inherit' });
+    process.chdir(grr);
+  }
   console.log(green('[inwasm compile]'), `Successfully built '${def.name}' (${formatBytes(result.length)}).\n`);
   if (result.length > 4095 && def.mode === OutputMode.SYNC && def.type !== OutputType.BYTES) {
     console.log(yellow('[inwasm compile]'), `Warning: The generated wasm unit '${def.name}'`);
