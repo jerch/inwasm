@@ -1,6 +1,6 @@
 {
   "name": "inwasm",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "Inline WebAssembly.",
   "main": "./lib/index.js",
   "types": "./lib/index.d.ts",
