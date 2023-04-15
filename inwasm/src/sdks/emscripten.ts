@@ -65,6 +65,6 @@ export function emscriptenRun(cmd: string) {
   } else {
     // FIXME: something is messed up here - emcc is not in path?
     const sdk = path.join(sdkPath, 'emsdk_env.bat');
-    cp.execSync(`${sdk} && ${cmd}`, {shell: 'cmd.exe', stdio: 'inherit'});
+    cp.execSync(`${sdk} && ${cmd}`, {shell: SHELL, stdio: 'inherit'});
   }
 }
