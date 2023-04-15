@@ -61,6 +61,6 @@ export function emscriptenRun(cmd: string) {
   console.log(`\n[emscripten.run] ${cmd}`);
   const sdk = isPosix
     ? `source ${path.join(sdkPath, 'emsdk_env.sh')} > /dev/null 2>&1`
-    : `path.join(sdkPath, 'emsdk_env.bat') >nul 2>&1`;
+    : `${path.join(sdkPath, 'emsdk_env.bat')} >nul 2>&1`;
   cp.execSync(`${sdk} && ${cmd}`, {shell: SHELL, stdio: 'inherit'});
 }
