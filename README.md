@@ -346,13 +346,11 @@ npm install
 ### TODO
 
 - ESM support
-- tests, tests, tests
+- more tests
 - option to write to different file
 - better docs
-- windows support
 
 
 ### State
 
-Early alpha, use at your own risk. Currently working on Linux,
-prolly also on macos (did just a preliminary test). No windows support yet.
+Still alpha, use at your own risk. Tested to work on Linux, macOS and Windows.
