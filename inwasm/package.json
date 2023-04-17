@@ -23,18 +23,18 @@
   "author": "Joerg Breitbart <j.breitbart@netzkolchose.de>",
   "license": "MIT",
   "devDependencies": {
+    "@types/acorn": "^6.0.0",
     "@types/mocha": "^9.1.1",
     "@types/node": "^16.18.23",
     "mocha": "^10.2.0",
-    "tsd": "^0.22.0",
-    "typescript": "^4.9.5"
+    "tsd": "^0.28.1",
+    "typescript": "^5.0.4"
   },
   "dependencies": {
-    "@types/acorn": "^4.0.6",
     "acorn": "^8.8.2",
     "acorn-walk": "^8.2.0",
     "chokidar": "^3.5.3",
-    "colorette": "^2.0.19",
+    "colorette": "^2.0.20",
     "glob": "^10.0.0",
     "wabt": "^1.0.32"
   }
