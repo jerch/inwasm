@@ -394,6 +394,10 @@ function reprocessSkipped(filename: string, id: string): boolean {
     const m = comment.value.match(REX);
     if (m && m.groups.id !== id) {
       const buildDir = path.join(path.resolve('./inwasm-builds'), filename, m.groups.name);
+      if (!fs.existsSync(path.join(buildDir, 'definition'))) {
+        // we lost the builddir for some reason?
+        return false;
+      }
       const def = JSON.parse(fs.readFileSync(path.join(buildDir, 'definition'), { encoding: 'utf-8' }));
       let rerun = false;
 
@@ -444,9 +448,9 @@ async function runWatcher(args: string[]) {
     if (['add', 'change'].includes(event)) {
       try {
         const id = randomId(8);
-        while(reprocessSkipped(filename, id)) {
+        do {
           await processFile(filename, id);
-        }
+        } while (reprocessSkipped(filename, id));
       } catch (e) {
         console.error(`Error while processing ${filename}:`);
         console.log(e);
@@ -504,9 +508,9 @@ async function main(): Promise<number> {
   const startTime = Date.now();
   for (const filename of files) {
     const id = randomId(8);
-    while(reprocessSkipped(filename, id)) {
+    do {
       await processFile(filename, id);
-    }
+    } while (reprocessSkipped(filename, id));
   }
   console.log(green('[inwasm]'), `Finished in ${Date.now() - startTime} msec.\n`);
   return 0;
