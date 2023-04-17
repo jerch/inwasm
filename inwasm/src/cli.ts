@@ -310,6 +310,7 @@ async function loadModuleES6(filename: string) {
  * Process a single source file.
  */
 async function processFile(filename: string) {
+  let handledUnits: string[] = [];
   let lastStackFrame: IStackFrameInfo = { at: '', unit: '', line: -1, column: -1 };
   // read file content, exit early if no InWasm was found at all
   let content = fs.readFileSync(filename, { encoding: 'utf-8' });
@@ -330,6 +331,11 @@ async function processFile(filename: string) {
     let lastEnd = 0;
     // FIXME: this expects UNITS to be sorted by start!!
     for (const wdef of UNITS) {
+      if (handledUnits.indexOf(wdef.definition.name) !== -1) {
+        throw Error(
+          `Inwasm definition.name must be unique within a source file.\n`
+          + `       "${wdef.definition.name}" is duplicated in "${filename}".`);
+      }
       // get stack position, error if we dont make any progress
       const stackFrame = getStackFrame(parseCallStack(wdef.stack), filename);
       if (lastStackFrame.line === stackFrame.line && lastStackFrame.column === stackFrame.column) {
@@ -346,8 +352,11 @@ async function processFile(filename: string) {
 
       // push parts with replacement
       final.push(content.slice(lastEnd, block.start));
+      final.push(` /* def: "${wdef.definition.name}" */ `);
       final.push(blockReplace);
       lastEnd = block.end;
+
+      handledUnits.push(wdef.definition.name);
     }
     final.push(content.slice(lastEnd));
 
@@ -367,7 +376,7 @@ const DEFAULT_GLOB = ['./**/*.wasm.js']
 /**
  * Run in watch mode.
  */
-function runWatcher(args: string[]) {
+async function runWatcher(args: string[]) {
   const pattern = args.length ? args : DEFAULT_GLOB;
   console.log(`Starting watch mode with pattern ${pattern.join(' ')}`);
   chokidar.watch(pattern).on('all', async (event, filename) => {
@@ -380,6 +389,11 @@ function runWatcher(args: string[]) {
       }
       console.log('\n\n');
     }
+  });
+  await new Promise<void>(r => {
+    process.on('SIGINT', r);
+    process.on('SIGQUIT', r);
+    process.on('SIGTERM', r);
   });
 }
 
@@ -409,13 +423,15 @@ function extractSwitches(args: string[]): string[] {
   return args;
 }
 
-async function main() {
+async function main(): Promise<number> {
   const args = extractSwitches(process.argv.slice(2));
   if (SWITCHES.watch) {
-    return runWatcher(args);
+    await runWatcher(args);
+    return 0;
   }
   if (!args.length) {
-    return console.log(`usage: inwasm [-wf] files|glob`);
+    console.log(`usage: inwasm [-wf] files|glob`);
+    return 1;
   }
   // minimal globbing support to work around window shell limitations
   const files = args.length === 1 && hasMagic(args, { magicalBraces: true })
@@ -423,13 +439,14 @@ async function main() {
     : args;
   const startTime = Date.now();
   for (const filename of files) {
-    try {
-      await processFile(filename);
-    } catch (e) {
-      throw(e);
-    }
+    await processFile(filename);
   }
   console.log(green('[inwasm]'), `Finished in ${Date.now() - startTime} msec.\n`);
+  return 0;
 }
 
-main();
+// handle exit code from promise resolve
+main().then(
+  () => process.exit(0),
+  err => { console.error(err); process.exit(1); }
+);
