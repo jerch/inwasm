@@ -30,6 +30,7 @@ jobs:
     - name: inwasm type tests
       run: cd inwasm && npm run test-types
     - run: cd testproject && npm install
+    - run: cd testproject && npm run inwasm # should re-run custom runner
     - name: Run testproject tests
       run: cd testproject && npm test
 
@@ -49,6 +50,7 @@ jobs:
     - run: rustup target add wasm32-unknown-unknown
     - run: rm -rf inwasm
     - run: cd testproject && ./install_fix.sh && npm install
+    - run: cd testproject && npm run inwasm # should re-run custom runner
     - run: cd testproject && npm test
 
   install-macos:
@@ -67,6 +69,7 @@ jobs:
     - run: rustup target add wasm32-unknown-unknown
     - run: rm -rf inwasm
     - run: cd testproject && ./install_fix.sh && npm install
+    - run: cd testproject && npm run inwasm # should re-run custom runner
     - run: cd testproject && npm test
 
   build-windows:
@@ -89,5 +92,6 @@ jobs:
     - name: inwasm type tests
       run: cd inwasm && npm run test-types
     - run: cd testproject && npm install
+    - run: cd testproject && npm run inwasm # should re-run custom runner
     - name: Run testproject tests
       run: cd testproject && npm test
