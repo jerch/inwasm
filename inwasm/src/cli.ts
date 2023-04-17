@@ -216,10 +216,8 @@ function mtimesHash(trackChanges: string[] | undefined): string {
 async function compileWasm(def: IWasmDefinition, filename: string, srcDef: string): Promise<Buffer> {
   console.log(yellow('[inwasm compile]'), `Building ${filename}:${def.name}`);
 
-  // create storeDef entry
   const memorySettings = extractMemorySettings(def);
   const mtimes = mtimesHash(def.trackChanges);
-  const storeDef = JSON.stringify({def, memorySettings, srcDef, mtimes});
 
   // create build folders
   const baseDir = path.resolve('./inwasm-builds');
@@ -234,7 +232,7 @@ async function compileWasm(def: IWasmDefinition, filename: string, srcDef: strin
       // conditional re-compilation
       if (fs.existsSync(path.join(buildDir, 'final.wasm')) && fs.existsSync(path.join(buildDir, 'definition'))) {
         const oldDef = fs.readFileSync(path.join(buildDir, 'definition'), { encoding: 'utf-8' });
-        if (oldDef === storeDef) {
+        if (oldDef === JSON.stringify({def, memorySettings, srcDef, mtimes})) {
           console.log(green('[inwasm compile]'), `Skipping '${def.name}' (unchanged).\n`);
           return fs.readFileSync(path.join(buildDir, 'final.wasm'));
         }
@@ -253,7 +251,7 @@ async function compileWasm(def: IWasmDefinition, filename: string, srcDef: strin
   // generate final.wasm, final.wat and definition file in build folder
   const target = path.join(buildDir, 'final');
   fs.writeFileSync(target + '.wasm', result);
-  fs.writeFileSync(path.join(buildDir, 'definition'), storeDef);
+  fs.writeFileSync(path.join(buildDir, 'definition'), JSON.stringify({def, memorySettings, srcDef, mtimes}));
 
   // expose wat file for inspection
   const call = `${WABT_TOOL.wasm2wat} "${target + '.wasm'}" --enable-all -o "${target + '.wat'}"`;
