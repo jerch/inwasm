@@ -2,6 +2,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { randomBytes, createHash } from 'crypto';
 import { execSync } from 'child_process';
 import { IWasmDefinition, CompilerRunner, _IWasmCtx, OutputMode, OutputType } from '.';
 
@@ -49,31 +50,12 @@ class InWasmReadExit extends Error { }
 
 /**
  * TODO:
- * - cmdline switch + config option for: force-recompile -force
  * - config option for: builddir (default: PROJECT/inwasm-builds)
  * - cmdline switch + config option for fail behavior:
  *    - fail-hard: stop at any error with returncode != 0
  *    - fail-soft: build as much as possible, returncode != 0
  *    - no-fail: only report errors, returncode 0 (default in watch mode)
- * - verbosity - silence most by default, escalate with -v, -vv etc.
- */
-
-
-/**
- * clang specifics
- *
- * https://lld.llvm.org/WebAssembly.html
- * https://clang.llvm.org/docs/AttributeReference.html
- * https://github.com/schellingb/ClangWasm
- * https://surma.dev/things/c-to-webassembly/
- * https://github.com/jedisct1/libclang_rt.builtins-wasm32.a
- * https://depth-first.com/articles/2019/10/16/compiling-c-to-webassembly-and-running-it-without-emscripten/
- * https://aransentin.github.io/cwasm/
- *
- * __attribute__((import_module("env"), import_name("externalFunction"))) void externalFunction(void);
- * __attribute__((export_name(<name>)))
- * __attribute__((import_module(<module_name>)))
- * __attribute__((import_name(<name>)))
+ * - verbosity - silence most by default, escalate with -v, -vv?
  */
 
 
@@ -105,6 +87,10 @@ let UNITS: IWasmSourceDefinition[] = [];
   }
 } as _IWasmCtx;
 
+
+function randomId(n: number): string {
+  return randomBytes(n).toString('hex');
+}
 
 /**
  * Parse callstack from InWasmReadExit errors.
@@ -200,35 +186,55 @@ function formatBytes(bytes: number, decimals: number = 2): string {
 
 
 /**
+ * Create a hash from matched files of globbing entries.
+ * FIXME: Would this run faster with async calls?
+ */
+function mtimesHash(trackChanges: string[] | undefined): string {
+  if (!trackChanges || !trackChanges.length) {
+    return '';
+  }
+  let filenames: string[] = [];
+  for (const entry of trackChanges) {
+    filenames = filenames.concat(globSync(entry));
+  }
+  if (!filenames.length) {
+    return '';
+  }
+  filenames.sort();
+  const hash = createHash('sha256');
+  for (const fname of filenames) {
+    hash.update(fname);
+    hash.update(fs.statSync(fname).mtime.getTime().toString());
+  }
+  return hash.digest('hex');
+}
+
+
+/**
  * Prepare build folder and call compiler backend.
  */
-/**
- * TODO: implement conditional re-compilation:
- * - on changes: diff definitions + additional source files (investigate how make determines recompilation)
- * - -f/force_recompilation setting
- *
- * default: recompile only on changes
- * also store last definition in build folders --> needed for diffing
- * (bonus side effect: by committing the definition + final.wasm from builds folders later on,
- * expensive recompilation with SDKs bootstrapping can be avoided) --> lifts burden from `npm install`
- */
-async function compileWasm(def: IWasmDefinition, filename: string): Promise<Buffer> {
+async function compileWasm(def: IWasmDefinition, filename: string, srcDef: string): Promise<Buffer> {
   console.log(yellow('[inwasm compile]'), `Building ${filename}:${def.name}`);
-  // FIXME: ensure we are at project root path
-  // get memory settings
+
+  // create storeDef entry
   const memorySettings = extractMemorySettings(def);
+  const mtimes = mtimesHash(def.trackChanges);
+  const storeDef = JSON.stringify({def, memorySettings, srcDef, mtimes});
+
   // create build folders
   const baseDir = path.resolve('./inwasm-builds');
-  if (!fs.existsSync(baseDir)) fs.mkdirSync(baseDir);
+  if (!fs.existsSync(baseDir)) {
+    fs.mkdirSync(baseDir);
+  }
   const buildDir = path.join(baseDir, filename, def.name);
-  if (!fs.existsSync(buildDir)) fs.mkdirSync(buildDir, { recursive: true });
-  else {
+  if (!fs.existsSync(buildDir)) {
+    fs.mkdirSync(buildDir, { recursive: true });
+  } else {
     if (!SWITCHES.force) {
       // conditional re-compilation
       if (fs.existsSync(path.join(buildDir, 'final.wasm')) && fs.existsSync(path.join(buildDir, 'definition'))) {
         const oldDef = fs.readFileSync(path.join(buildDir, 'definition'), { encoding: 'utf-8' });
-        // TODO: re-enable once we have a force recompilation switch
-        if (oldDef === JSON.stringify({def, memorySettings})) {
+        if (oldDef === storeDef) {
           console.log(green('[inwasm compile]'), `Skipping '${def.name}' (unchanged).\n`);
           return fs.readFileSync(path.join(buildDir, 'final.wasm'));
         }
@@ -239,18 +245,20 @@ async function compileWasm(def: IWasmDefinition, filename: string): Promise<Buff
   let result: Buffer;
   try {
     result = Buffer.from(await COMPILER_RUNNERS[def.srctype](def, buildDir, filename, memorySettings));
-    // FIXME: abort on error...
   } finally {
     process.chdir(wd);
   }
   if (!result || !result.length) throw new Error('compile error');
+
   // generate final.wasm, final.wat and definition file in build folder
   const target = path.join(buildDir, 'final');
   fs.writeFileSync(target + '.wasm', result);
-  fs.writeFileSync(path.join(buildDir, 'definition'), JSON.stringify({def, memorySettings}));
-  // FIXME: how to deal with custom features here, and in runners?
-  const call = `${WABT_TOOL.wasm2wat} "${target + '.wasm'}" -o "${target + '.wat'}"`;
+  fs.writeFileSync(path.join(buildDir, 'definition'), storeDef);
+
+  // expose wat file for inspection
+  const call = `${WABT_TOOL.wasm2wat} "${target + '.wasm'}" --enable-all -o "${target + '.wat'}"`;
   execSync(call, { shell: SHELL, stdio: 'inherit' });
+
   console.log(green('[inwasm compile]'), `Successfully built '${def.name}' (${formatBytes(result.length)}).\n`);
   if (result.length > 4095 && def.mode === OutputMode.SYNC && def.type !== OutputType.BYTES) {
     console.log(yellow('[inwasm compile]'), `Warning: The generated wasm unit '${def.name}'`);
@@ -309,7 +317,7 @@ async function loadModuleES6(filename: string) {
 /**
  * Process a single source file.
  */
-async function processFile(filename: string) {
+async function processFile(filename: string, id: string) {
   let handledUnits: string[] = [];
   let lastStackFrame: IStackFrameInfo = { at: '', unit: '', line: -1, column: -1 };
   // read file content, exit early if no InWasm was found at all
@@ -347,13 +355,14 @@ async function processFile(filename: string) {
       const block = identifyDefinitionBlock(stackFrame, content);
 
       // compile & create new block
-      const wasm = await compileWasm(wdef.definition, filename);
+      const wasm = await compileWasm(wdef.definition, filename, content.slice(block.start, block.end));
       const blockReplace = createRuntimeDefinition(wasm, wdef);
 
       // push parts with replacement
       final.push(content.slice(lastEnd, block.start));
-      final.push(` /* def: "${wdef.definition.name}" */ `);
+      final.push(`/*inwasm#${id}:rdef-start:"${wdef.definition.name}"*/`);
       final.push(blockReplace);
+      final.push(`/*inwasm#${id}:rdef-end:"${wdef.definition.name}"*/`);
       lastEnd = block.end;
 
       handledUnits.push(wdef.definition.name);
@@ -366,6 +375,58 @@ async function processFile(filename: string) {
     // re-read content
     content = fs.readFileSync(filename, { encoding: 'utf-8' });
   }
+}
+
+
+function reprocessSkipped(filename: string, id: string): boolean {
+  let content = fs.readFileSync(filename, { encoding: 'utf-8' });
+  if (content.indexOf('InWasm') === -1) return false;
+
+  // collect comments from source
+  const comments: any[] = [];
+  acorn.parse(content, { locations: true, ecmaVersion: 'latest', onComment: comments });
+
+  const reval: {[key: string]: {start: number, end: number, src: string}} = {};
+
+  // filter comments for inwasm#hhhhhhhhhhhhhhhh:rdef-start|end:"name"
+  const REX = /^inwasm#(?<id>[0-9a-f]{16}):rdef-(?<type>end|start):"(?<name>.+?)"$/;
+  for (const comment of comments) {
+    const m = comment.value.match(REX);
+    if (m && m.groups.id !== id) {
+      const buildDir = path.join(path.resolve('./inwasm-builds'), filename, m.groups.name);
+      const def = JSON.parse(fs.readFileSync(path.join(buildDir, 'definition'), { encoding: 'utf-8' }));
+      let rerun = false;
+
+      if (SWITCHES.force || def.def.noCache) {
+        // always re-run on force and for noCache entries
+        rerun = true;
+      } else if (def.def.trackChanges) {
+        // re-run on mtime changes of tracked files
+        const mtimes = mtimesHash(def.def.trackChanges);
+        if (mtimes !== def.mtimes) {
+          rerun = true;
+        }
+      }
+
+      if (rerun) {
+        if (!reval[m.groups.name]) {
+          reval[m.groups.name] = {start: -1, end: -1, src: def.srcDef};
+        }
+        reval[m.groups.name][m.groups.type as 'start' | 'end'] = comment[m.groups.type];
+      }
+    }
+  }
+
+  // re-create first unit matched from above
+  for (const [k, v] of Object.entries(reval)) {
+    if (v.start === -1 || v.end === -1) {
+      throw new Error('unbalanced inwasm comments');
+    }
+    const parts: string[] = [content.slice(0, v.start), v.src, content.slice(v.end)];
+    fs.writeFileSync(filename, parts.join(''));
+    return true;
+  }
+  return false;
 }
 
 
@@ -382,7 +443,10 @@ async function runWatcher(args: string[]) {
   chokidar.watch(pattern).on('all', async (event, filename) => {
     if (['add', 'change'].includes(event)) {
       try {
-        await processFile(filename);
+        const id = randomId(8);
+        while(reprocessSkipped(filename, id)) {
+          await processFile(filename, id);
+        }
       } catch (e) {
         console.error(`Error while processing ${filename}:`);
         console.log(e);
@@ -439,7 +503,10 @@ async function main(): Promise<number> {
     : args;
   const startTime = Date.now();
   for (const filename of files) {
-    await processFile(filename);
+    const id = randomId(8);
+    while(reprocessSkipped(filename, id)) {
+      await processFile(filename, id);
+    }
   }
   console.log(green('[inwasm]'), `Finished in ${Date.now() - startTime} msec.\n`);
   return 0;

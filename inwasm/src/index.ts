@@ -43,17 +43,21 @@ export interface IWasmDefinition {
     // Custom cmdline defines, e.g. {ABC: 123} provided as -DABC=123 to the compiler.
     defines?: { [key: string]: string | number };
     // Additional include paths, should be absolute. (TODO...)
-    include?: string[];
+    // include?: string[];
     // Additional source files (copied over). (TODO...)
-    sources?: string[];
+    // sources?: string[];
     // FIXME: check support for -lxy with wasm
-    //libs?: string[],
-    // Custom cmdline switches, overriding any from above. (TODO...)
+    // libs?: string[],
+    // Custom cmdline switches, overriding any from above.
     switches?: string[];
   };
   customRunner?: CompilerRunner;
   // Inline source code (C or C++).
-  code: string
+  code: string;
+  // Whether to always run compiler runner.
+  noCache?: boolean;
+  // List of globbing entries to track mtime of additional files.
+  trackChanges?: string[];
 }
 export interface IWasmDefinitionSync extends IWasmDefinition {
   mode: OutputMode.SYNC

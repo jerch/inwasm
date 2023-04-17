@@ -4,6 +4,24 @@ import { emscriptenRun, getClangBinPath } from '../sdks/emscripten';
 import { IMemorySettings, IWasmDefinition } from '..';
 
 
+/**
+ * clang specifics
+ *
+ * https://lld.llvm.org/WebAssembly.html
+ * https://clang.llvm.org/docs/AttributeReference.html
+ * https://github.com/schellingb/ClangWasm
+ * https://surma.dev/things/c-to-webassembly/
+ * https://github.com/jedisct1/libclang_rt.builtins-wasm32.a
+ * https://depth-first.com/articles/2019/10/16/compiling-c-to-webassembly-and-running-it-without-emscripten/
+ * https://aransentin.github.io/cwasm/
+ *
+ * __attribute__((import_module("env"), import_name("externalFunction"))) void externalFunction(void);
+ * __attribute__((export_name(<name>)))
+ * __attribute__((import_module(<module_name>)))
+ * __attribute__((import_name(<name>)))
+ */
+
+
 export default function(def: IWasmDefinition, buildDir: string, filename: string, memorySettings: IMemorySettings): Uint8Array {
   // TODO: copy additional files
   process.chdir(buildDir);
