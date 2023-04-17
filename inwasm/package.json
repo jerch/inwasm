@@ -1,6 +1,6 @@
 {
   "name": "inwasm",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "description": "Inline WebAssembly.",
   "main": "./lib/index.js",
   "types": "./lib/index.d.ts",
@@ -12,7 +12,8 @@
     "test-types": "cp src/index.test-d.ts lib && tsd",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "prepublish": "npm run build",
+    "prepack": "npm run build && cp ../README.md .",
+    "postpack": "rm README.md",
     "clean": "rm -rf lib",
     "build": "tsc"
   },
