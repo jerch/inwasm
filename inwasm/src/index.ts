@@ -56,8 +56,17 @@ export interface IWasmDefinition {
   code: string;
   // Whether to always run compiler runner.
   noCache?: boolean;
-  // List of globbing entries to track mtime of additional files.
+  // List of globbing entries to track additional files.
   trackChanges?: string[];
+  /**
+   * Hash mode for file tracking, default is 'mtime'.
+   * 'mtime' is good enough for local development and faster than 'content'.
+   * 'content' does a sha256 hashing from all file contents ordered. This is more
+   * expensive than 'mtime', but can avoid costly sdk loading in checkouts
+   * containing build targets (e.g. to speedup CI runtime). 'mtime' will fail here
+   * due to the newer file timestamps.
+   */
+  trackMode?: 'mtime' | 'content';
 }
 export interface IWasmDefinitionSync extends IWasmDefinition {
   mode: OutputMode.SYNC

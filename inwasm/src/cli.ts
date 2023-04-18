@@ -186,21 +186,25 @@ function formatBytes(bytes: number, decimals: number = 2): string {
 
 
 /**
- * Create a hash from matched files of globbing entries.
- * FIXME: Would this run faster with async calls?
+ * Resolve glob pattern to ordered list of filenames.
  */
-function mtimesHash(trackChanges: string[] | undefined): string {
+function getTrackedFilenames(trackChanges: string[] | undefined): string[] {
   if (!trackChanges || !trackChanges.length) {
-    return '';
+    return [];
   }
   let filenames: string[] = [];
   for (const entry of trackChanges) {
     filenames = filenames.concat(globSync(entry));
   }
-  if (!filenames.length) {
-    return '';
-  }
   filenames.sort();
+  return filenames;
+}
+
+
+/**
+ * Create a hash from filenames and mtimes.
+ */
+function mtimesHash(filenames: string[]): string {
   const hash = createHash('sha256');
   for (const fname of filenames) {
     hash.update(fname);
@@ -211,13 +215,41 @@ function mtimesHash(trackChanges: string[] | undefined): string {
 
 
 /**
+ * Create a hash from file contents.
+ * Other than the mtime hash this does not hash filenames to avoid
+ * hash differences from different path notations.
+ */
+function contentsHash(filenames: string[]): string {
+  const hash = createHash('sha256');
+  for (const fname of filenames) {
+    hash.update(fs.readFileSync(fname));
+  }
+  return hash.digest('hex');
+}
+
+/**
+ * Create a single mtime or content hash from tracked globbing file pattern.
+ */
+function hashTracked(mode: 'mtime' | 'content' | undefined, trackChanges: string[] | undefined): string {
+  const filenames = getTrackedFilenames(trackChanges);
+  if (!filenames.length) return '';
+  if (mode === 'content') return contentsHash(filenames);
+  return mtimesHash(filenames);
+}
+
+
+function sha256(data: Buffer | string): string {
+  return createHash('sha256').update(data).digest('hex');
+}
+
+
+/**
  * Prepare build folder and call compiler backend.
  */
 async function compileWasm(def: IWasmDefinition, filename: string, srcDef: string): Promise<Buffer> {
   console.log(yellow('[inwasm compile]'), `Building ${filename}:${def.name}`);
 
   const memorySettings = extractMemorySettings(def);
-  const mtimes = mtimesHash(def.trackChanges);
 
   // create build folders
   const baseDir = path.resolve('./inwasm-builds');
@@ -230,9 +262,10 @@ async function compileWasm(def: IWasmDefinition, filename: string, srcDef: strin
   } else {
     if (!SWITCHES.force) {
       // conditional re-compilation
-      if (fs.existsSync(path.join(buildDir, 'final.wasm')) && fs.existsSync(path.join(buildDir, 'definition'))) {
-        const oldDef = fs.readFileSync(path.join(buildDir, 'definition'), { encoding: 'utf-8' });
-        if (oldDef === JSON.stringify({def, memorySettings, srcDef, mtimes})) {
+      if (fs.existsSync(path.join(buildDir, 'final.wasm')) && fs.existsSync(path.join(buildDir, 'definition.json'))) {
+        const oldDef = fs.readFileSync(path.join(buildDir, 'definition.json'), { encoding: 'utf-8' });
+        const calcDef = JSON.stringify({ def, memorySettings, srcDef, hash: hashTracked(def.trackMode, def.trackChanges) });
+        if (oldDef === calcDef) {
           console.log(green('[inwasm compile]'), `Skipping '${def.name}' (unchanged).\n`);
           return fs.readFileSync(path.join(buildDir, 'final.wasm'));
         }
@@ -251,7 +284,10 @@ async function compileWasm(def: IWasmDefinition, filename: string, srcDef: strin
   // generate final.wasm, final.wat and definition file in build folder
   const target = path.join(buildDir, 'final');
   fs.writeFileSync(target + '.wasm', result);
-  fs.writeFileSync(path.join(buildDir, 'definition'), JSON.stringify({def, memorySettings, srcDef, mtimes}));
+  fs.writeFileSync(
+    path.join(buildDir, 'definition.json'),
+    JSON.stringify({ def, memorySettings, srcDef, hash: hashTracked(def.trackMode, def.trackChanges) })
+  );
 
   // expose wat file for inspection
   const call = `${WABT_TOOL.wasm2wat} "${target + '.wasm'}" --enable-all -o "${target + '.wat'}"`;
@@ -335,7 +371,6 @@ async function processFile(filename: string, id: string) {
 
     const final: string[] = [];
     let lastEnd = 0;
-    // FIXME: this expects UNITS to be sorted by start!!
     for (const wdef of UNITS) {
       if (handledUnits.indexOf(wdef.definition.name) !== -1) {
         throw Error(
@@ -391,30 +426,29 @@ function reprocessSkipped(filename: string, id: string): boolean {
   for (const comment of comments) {
     const m = comment.value.match(REX);
     if (m && m.groups.id !== id) {
+      if (m.groups.type === 'end') {
+        if (reval[m.groups.name]) {
+          reval[m.groups.name].end = comment.end;
+        }
+        continue;
+      }
       const buildDir = path.join(path.resolve('./inwasm-builds'), filename, m.groups.name);
-      if (!fs.existsSync(path.join(buildDir, 'definition'))) {
+      if (!fs.existsSync(path.join(buildDir, 'definition.json'))) {
         // we lost the builddir for some reason?
         return false;
       }
-      const def = JSON.parse(fs.readFileSync(path.join(buildDir, 'definition'), { encoding: 'utf-8' }));
-      let rerun = false;
+      const def = JSON.parse(fs.readFileSync(path.join(buildDir, 'definition.json'), { encoding: 'utf-8' }));
 
-      if (SWITCHES.force || def.def.noCache) {
-        // always re-run on force and for noCache entries
-        rerun = true;
-      } else if (def.def.trackChanges) {
-        // re-run on mtime changes of tracked files
-        const mtimes = mtimesHash(def.def.trackChanges);
-        if (mtimes !== def.mtimes) {
-          rerun = true;
+      /**
+       * re-run on:
+       * - force switch
+       * - noCache flag
+       * - hash difference (either mtime or content)
+       */
+      if (SWITCHES.force || def.def.noCache || hashTracked(def.def.trackMode, def.def.trackChanges) !== def.hash) {
+        if (m.groups.type === 'start') {
+          reval[m.groups.name] = {start: comment.start, end: -1, src: def.srcDef};
         }
-      }
-
-      if (rerun) {
-        if (!reval[m.groups.name]) {
-          reval[m.groups.name] = {start: -1, end: -1, src: def.srcDef};
-        }
-        reval[m.groups.name][m.groups.type as 'start' | 'end'] = comment[m.groups.type];
       }
     }
   }
@@ -424,11 +458,93 @@ function reprocessSkipped(filename: string, id: string): boolean {
     if (v.start === -1 || v.end === -1) {
       throw new Error('unbalanced inwasm comments');
     }
-    const parts: string[] = [content.slice(0, v.start), v.src, content.slice(v.end)];
-    fs.writeFileSync(filename, parts.join(''));
+    fs.writeFileSync(filename, content.slice(0, v.start) + v.src + content.slice(v.end));
     return true;
   }
   return false;
+}
+
+
+/**
+ * Watchers for foreign files per source file.
+ */
+interface IPatternWatcher {
+  pattern: Set<string>;
+  watcher: chokidar.FSWatcher;
+}
+const watchers: {[key: string]: IPatternWatcher} = {};
+
+
+function updateForeignWatch(filename: string) {
+  let content = fs.readFileSync(filename, { encoding: 'utf-8' });
+  if (content.indexOf('InWasm') === -1) return false;
+
+  // collect comments from source
+  const comments: any[] = [];
+  acorn.parse(content, { locations: true, ecmaVersion: 'latest', onComment: comments });
+
+  const pattern: Set<string> = new Set();
+
+  // filter comments for inwasm#hhhhhhhhhhhhhhhh:rdef-start|end:"name"
+  const REX = /^inwasm#(?<id>[0-9a-f]{16}):rdef-(?<type>end|start):"(?<name>.+?)"$/;
+  for (const comment of comments) {
+    const m = comment.value.match(REX);
+    if (m && m.groups.type === 'start') {
+      const buildDir = path.join(path.resolve('./inwasm-builds'), filename, m.groups.name);
+      if (!fs.existsSync(path.join(buildDir, 'definition.json'))) {
+        // we lost the builddir for some reason?
+        continue;
+      }
+      const def = JSON.parse(fs.readFileSync(path.join(buildDir, 'definition.json'), { encoding: 'utf-8' }));
+
+      if (def.def.trackChanges) {
+        for (const entry of def.def.trackChanges) pattern.add(entry);
+      }
+    }
+  }
+
+  // got nothing to track?
+  if (!pattern.size) {
+    if (watchers[filename]) {
+      watchers[filename].watcher.close();
+      delete watchers[filename];
+    }
+    return;
+  }
+
+  // check if nothing has changed
+  if (watchers[filename]) {
+    const oldPattern = watchers[filename].pattern;
+    let isEqual = pattern.size === oldPattern.size;
+    if (isEqual) {
+      for (const elem of pattern) {
+        if (!oldPattern.has(elem)) {
+          isEqual = false;
+          break;
+        }
+      }
+    }
+    if (isEqual) return;
+  }
+
+  // we have changes in tracks
+  if (watchers[filename]) {
+    // pattern changed, close old watcher
+    watchers[filename].watcher.close();
+  }
+
+  const watcher = chokidar.watch(Array.from(pattern));
+  watcher.on('change', async () => {
+    try {
+      // since we are in watch mode, it is enough to call reprocessSkipped,
+      // which will trigger a rebuild from main watcher, if relevant changes occurred
+      reprocessSkipped(filename, randomId(8));
+    } catch (e) {
+      console.error(`Error while processing ${filename}:`);
+      console.log(e);
+    }
+  });
+  watchers[filename] = {pattern, watcher};
 }
 
 
@@ -442,13 +558,20 @@ const DEFAULT_GLOB = ['./**/*.wasm.js']
 async function runWatcher(args: string[]) {
   const pattern = args.length ? args : DEFAULT_GLOB;
   console.log(`Starting watch mode with pattern ${pattern.join(' ')}`);
+
+  const fileHashes: {[key: string]: string} = {};
   chokidar.watch(pattern).on('all', async (event, filename) => {
     if (['add', 'change'].includes(event)) {
+      if (sha256(fs.readFileSync(filename)) === fileHashes[filename]) {
+        return;
+      }
       try {
         const id = randomId(8);
         do {
           await processFile(filename, id);
         } while (reprocessSkipped(filename, id));
+        fileHashes[filename] = sha256(fs.readFileSync(filename));
+        updateForeignWatch(filename);
       } catch (e) {
         console.error(`Error while processing ${filename}:`);
         console.log(e);

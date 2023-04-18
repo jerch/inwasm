@@ -21,7 +21,8 @@ export const custom = InWasm({
   },
   code: '',
   // noCache: false, // true by default for custom runner
-  trackChanges: ['custom/module.wat']
+  trackChanges: ['custom/module.wat'],
+  trackMode: 'content'
 })();
 
 
