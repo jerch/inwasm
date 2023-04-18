@@ -371,7 +371,6 @@ async function processFile(filename: string, id: string) {
 
     const final: string[] = [];
     let lastEnd = 0;
-    // FIXME: this expects UNITS to be sorted by start!!
     for (const wdef of UNITS) {
       if (handledUnits.indexOf(wdef.definition.name) !== -1) {
         throw Error(
@@ -466,6 +465,89 @@ function reprocessSkipped(filename: string, id: string): boolean {
 }
 
 
+/**
+ * Watchers for foreign files per source file.
+ */
+interface IPatternWatcher {
+  pattern: Set<string>;
+  watcher: chokidar.FSWatcher;
+}
+const watchers: {[key: string]: IPatternWatcher} = {};
+
+
+function updateForeignWatch(filename: string) {
+  let content = fs.readFileSync(filename, { encoding: 'utf-8' });
+  if (content.indexOf('InWasm') === -1) return false;
+
+  // collect comments from source
+  const comments: any[] = [];
+  acorn.parse(content, { locations: true, ecmaVersion: 'latest', onComment: comments });
+
+  const pattern: Set<string> = new Set();
+
+  // filter comments for inwasm#hhhhhhhhhhhhhhhh:rdef-start|end:"name"
+  const REX = /^inwasm#(?<id>[0-9a-f]{16}):rdef-(?<type>end|start):"(?<name>.+?)"$/;
+  for (const comment of comments) {
+    const m = comment.value.match(REX);
+    if (m && m.groups.type === 'start') {
+      const buildDir = path.join(path.resolve('./inwasm-builds'), filename, m.groups.name);
+      if (!fs.existsSync(path.join(buildDir, 'definition.json'))) {
+        // we lost the builddir for some reason?
+        continue;
+      }
+      const def = JSON.parse(fs.readFileSync(path.join(buildDir, 'definition.json'), { encoding: 'utf-8' }));
+
+      if (def.def.trackChanges) {
+        for (const entry of def.def.trackChanges) pattern.add(entry);
+      }
+    }
+  }
+
+  // got nothing to track?
+  if (!pattern.size) {
+    if (watchers[filename]) {
+      watchers[filename].watcher.close();
+      delete watchers[filename];
+    }
+    return;
+  }
+
+  // check if nothing has changed
+  if (watchers[filename]) {
+    const oldPattern = watchers[filename].pattern;
+    let isEqual = pattern.size === oldPattern.size;
+    if (isEqual) {
+      for (const elem of pattern) {
+        if (!oldPattern.has(elem)) {
+          isEqual = false;
+          break;
+        }
+      }
+    }
+    if (isEqual) return;
+  }
+
+  // we have changes in tracks
+  if (watchers[filename]) {
+    // pattern changed, close old watcher
+    watchers[filename].watcher.close();
+  }
+
+  const watcher = chokidar.watch(Array.from(pattern));
+  watcher.on('change', async () => {
+    try {
+      // since we are in watch mode, it is enough to call reprocessSkipped,
+      // which will trigger a rebuild from main watcher, if relevant changes occurred
+      reprocessSkipped(filename, randomId(8));
+    } catch (e) {
+      console.error(`Error while processing ${filename}:`);
+      console.log(e);
+    }
+  });
+  watchers[filename] = {pattern, watcher};
+}
+
+
 // default glob pattern
 const DEFAULT_GLOB = ['./**/*.wasm.js']
 
@@ -489,6 +571,7 @@ async function runWatcher(args: string[]) {
           await processFile(filename, id);
         } while (reprocessSkipped(filename, id));
         fileHashes[filename] = sha256(fs.readFileSync(filename));
+        updateForeignWatch(filename);
       } catch (e) {
         console.error(`Error while processing ${filename}:`);
         console.log(e);
