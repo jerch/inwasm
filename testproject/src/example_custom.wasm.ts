@@ -20,7 +20,7 @@ export const custom = InWasm({
     add: (a: number, b: number) => 0
   },
   code: '',
-  // noCache: false, // true by default for custom runner
+  noCache: true,
   trackChanges: ['custom/module.wat'],
   trackMode: 'content'
 })();

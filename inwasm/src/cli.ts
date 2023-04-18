@@ -260,13 +260,23 @@ async function compileWasm(def: IWasmDefinition, filename: string, srcDef: strin
   if (!fs.existsSync(buildDir)) {
     fs.mkdirSync(buildDir, { recursive: true });
   } else {
-    if (!SWITCHES.force) {
-      // conditional re-compilation
+    /**
+     * conditional re-compilation, try using cached version:
+     * - never on force -f
+     * - always on -S
+     * - not on noCache w'o -S
+     * - fall-through to compilation, if builddir or final.wasm is missing
+     */
+    if (!SWITCHES.force && (!def.noCache || (def.noCache && SWITCHES.skip))) {
       if (fs.existsSync(path.join(buildDir, 'final.wasm')) && fs.existsSync(path.join(buildDir, 'definition.json'))) {
         const oldDef = fs.readFileSync(path.join(buildDir, 'definition.json'), { encoding: 'utf-8' });
         const calcDef = JSON.stringify({ def, memorySettings, srcDef, hash: hashTracked(def.trackMode, def.trackChanges) });
         if (oldDef === calcDef) {
           console.log(green('[inwasm compile]'), `Skipping '${def.name}' (unchanged).\n`);
+          return fs.readFileSync(path.join(buildDir, 'final.wasm'));
+        } else if (SWITCHES.skip) {
+          fs.writeFileSync(path.join(buildDir, 'definition.json'), calcDef);
+          console.log(green('[inwasm compile]'), `Skipping '${def.name}' (force-skipped by -S).\n`);
           return fs.readFileSync(path.join(buildDir, 'final.wasm'));
         }
       }
@@ -590,7 +600,8 @@ async function runWatcher(args: string[]) {
 // some cmdline switches
 const SWITCHES = {
   watch: false,
-  force: false
+  force: false,
+  skip: false
 };
 
 
@@ -599,6 +610,7 @@ function extractSwitches(args: string[]): string[] {
    * known switches:
    *  -w    watch mode
    *  -f    force recompilation
+   *  -S    skip compilation, if build target was found
    * more to come...
    */
   if (args.indexOf('-w') !== -1) {
@@ -608,6 +620,10 @@ function extractSwitches(args: string[]): string[] {
   if (args.indexOf('-f') !== -1) {
     args.splice(args.indexOf('-f'), 1);
     SWITCHES.force = true;
+  }
+  if (args.indexOf('-S') !== -1) {
+    args.splice(args.indexOf('-S'), 1);
+    SWITCHES.skip = !SWITCHES.force;  // apply -S only if -f was not applied
   }
   return args;
 }
@@ -619,7 +635,7 @@ async function main(): Promise<number> {
     return 0;
   }
   if (!args.length) {
-    console.log(`usage: inwasm [-wf] files|glob`);
+    console.log(`usage: inwasm [-wfS] files|glob`);
     return 1;
   }
   // minimal globbing support to work around window shell limitations
