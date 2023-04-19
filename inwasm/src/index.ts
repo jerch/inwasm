@@ -107,13 +107,8 @@ export interface IWasmInstance<T extends IWasmDefinition> extends WebAssemblyExt
 }
 
 // Type helper to infer wasm definition from BYTES, MODULE and INSTANCE manually.
-export type ExtractDefinition<Type> = Type extends IWasmBytes<infer X> ? X
-  : Type extends Promise<IWasmBytes<infer X>> ? X
-  : Type extends IWasmModule<infer X> ? X
-  : Type extends Promise<IWasmModule<infer X>> ? X
-  : Type extends IWasmInstance<infer X> ? X
-  : Type extends Promise<IWasmInstance<infer X>> ? X
-  : never;
+type IWasmResult<X extends IWasmDefinition> = IWasmInstance<X> | IWasmBytes<X> | IWasmModule<X>;
+export type ExtractDefinition<Type> = Type extends (IWasmResult<infer X> | Promise<IWasmResult<infer X>>) ? X : never;
 
 // Respone overload to carry definition forward
 export interface IWasmResponse<T extends IWasmDefinition> extends Response {}
