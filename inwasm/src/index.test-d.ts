@@ -157,7 +157,7 @@ expectType<IWasmInstance<{
 }>>(inst);
 
 // redeclaring response type
-const resp = fetch('xyz') as Promise<IWasmResponse<ExtractDefinition<typeof bytes>>>;
+const resp = new Promise<Response>(r => r(new Response)) as Promise<IWasmResponse<ExtractDefinition<typeof bytes>>>;
 expectType<Promise<IWasmResponse<ExtractDefinition<{
   name: string,
   type: OutputType.BYTES,
@@ -255,7 +255,7 @@ expectType<Promise<IWasmModule<{
   code: string
 }>>>(WAE.compileStreaming(resp));
 // compileStreaming - generic
-expectType<Promise<WebAssemblyExtended.Module>>(WAE.compileStreaming(fetch('something')));
+expectType<Promise<WebAssemblyExtended.Module>>(WAE.compileStreaming(new Promise<Response>(r => r(new Response))));
 
 // instantiate - overloaded
 // from bytes
@@ -310,4 +310,4 @@ expectType<Promise<WebAssemblyExtended.IWasmInstantiatedSource<{
   code: string
 }>>>(WAE.instantiateStreaming(resp));
 // instantiateStreaming - generic
-expectType<Promise<WebAssemblyExtended.WebAssemblyInstantiatedSource>>(WAE.instantiateStreaming(fetch('something')));
+expectType<Promise<WebAssemblyExtended.WebAssemblyInstantiatedSource>>(WAE.instantiateStreaming(new Promise<Response>(r => r(new Response))));
