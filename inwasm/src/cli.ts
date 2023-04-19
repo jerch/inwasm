@@ -261,23 +261,27 @@ async function compileWasm(def: IWasmDefinition, filename: string, srcDef: strin
     fs.mkdirSync(buildDir, { recursive: true });
   } else {
     /**
-     * conditional re-compilation, try using cached version:
-     * - never on force -f
-     * - always on -S
-     * - not on noCache w'o -S
-     * - fall-through to compilation, if builddir or final.wasm is missing
+     * conditional re-compilation:
+     * - final.wasm exists
+     *    - skip -S                         -> load cached wasm file (also for noCache)
+     *    - noCache                         -> compile
+     *    - equal definition exists         -> load cached wasm file
+     *    - no definition or not equal      -> compile
+     * - force -f                           -> compile
+     * - no final.wasm                      -> compile
      */
-    if (!SWITCHES.force && (!def.noCache || (def.noCache && SWITCHES.skip))) {
-      if (fs.existsSync(path.join(buildDir, 'final.wasm')) && fs.existsSync(path.join(buildDir, 'definition.json'))) {
+    const wasmPath = path.join(buildDir, 'final.wasm');
+    if (fs.existsSync(wasmPath) && !SWITCHES.force && (!def.noCache || (def.noCache && SWITCHES.skip))) {
+      if (SWITCHES.skip) {
+        console.log(green('[inwasm compile]'), `Skipping '${def.name}' (force-skipped by -S).\n`);
+        return fs.readFileSync(wasmPath);
+      }
+      if (fs.existsSync(path.join(buildDir, 'definition.json'))) {
         const oldDef = fs.readFileSync(path.join(buildDir, 'definition.json'), { encoding: 'utf-8' });
         const calcDef = JSON.stringify({ def, memorySettings, srcDef, hash: hashTracked(def.trackMode, def.trackChanges) });
         if (oldDef === calcDef) {
           console.log(green('[inwasm compile]'), `Skipping '${def.name}' (unchanged).\n`);
-          return fs.readFileSync(path.join(buildDir, 'final.wasm'));
-        } else if (SWITCHES.skip) {
-          fs.writeFileSync(path.join(buildDir, 'definition.json'), calcDef);
-          console.log(green('[inwasm compile]'), `Skipping '${def.name}' (force-skipped by -S).\n`);
-          return fs.readFileSync(path.join(buildDir, 'final.wasm'));
+          return fs.readFileSync(wasmPath);
         }
       }
     }
@@ -544,11 +548,17 @@ function updateForeignWatch(filename: string) {
   }
 
   const watcher = chokidar.watch(Array.from(pattern));
-  watcher.on('change', async () => {
+  watcher.on('change', () => {
     try {
-      // since we are in watch mode, it is enough to call reprocessSkipped,
-      // which will trigger a rebuild from main watcher, if relevant changes occurred
-      reprocessSkipped(filename, randomId(8));
+      /**
+       * trigger rebuild:
+       * - already built targets by reprocessSkipped
+       * - uncompiled targets by explicit mtime change
+       */
+      if (!reprocessSkipped(filename, randomId(8))) {
+        const t = new Date();
+        fs.utimesSync(filename, t, t);
+      }
     } catch (e) {
       console.error(`Error while processing ${filename}:`);
       console.log(e);
