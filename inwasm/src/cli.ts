@@ -544,11 +544,17 @@ function updateForeignWatch(filename: string) {
   }
 
   const watcher = chokidar.watch(Array.from(pattern));
-  watcher.on('change', async () => {
+  watcher.on('change', () => {
     try {
-      // since we are in watch mode, it is enough to call reprocessSkipped,
-      // which will trigger a rebuild from main watcher, if relevant changes occurred
-      reprocessSkipped(filename, randomId(8));
+      /**
+       * trigger rebuild:
+       * - already built targets by reprocessSkipped
+       * - uncompiled targets by explicit mtime change
+       */
+      if (!reprocessSkipped(filename, randomId(8))) {
+        const t = new Date();
+        fs.utimesSync(filename, t, t);
+      }
     } catch (e) {
       console.error(`Error while processing ${filename}:`);
       console.log(e);
