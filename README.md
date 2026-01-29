@@ -88,14 +88,13 @@ and/or rust with wasm-bindgen.
 
 Source Types (`srctype`):
 - `'C'` - emscripten C, compiled as standalone wasm
+- `'C++'` - emscripten C++, compiled as standalone wasm
 - `'Clang-C'` - using clang from emscripten SDK
+- `'Clang-C++'` - using clang++ from emscripten SDK
 - `'Zig'` - preinstalled or autoinstall, compiled as freestanding
 - `'wat'` - compiled with wat2wasm
 - `'Rust'` - must be preinstalled currently with `cargo` in PATH
 - `'custom'` - any custom build script
-
-... TODO: document srctype extensions on wasm definitions, C++ runners ...
-
 
 Output Types (`type`):
 - `BYTES` - Uint8Array (raw wasm bytes), typed as `IWasmBytes<T extends IWasmDefinition>`

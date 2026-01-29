@@ -17,7 +17,9 @@ import { APP_ROOT, PROJECT_ROOT, CONFIG, SHELL, isPosix, WABT_TOOL } from './con
 
 // compiler runners
 import emscripten_c from './runners/emscripten_c';
+import emscripten_cpp from './runners/emscripten_cpp';
 import clang_c from './runners/clang_c';
+import clang_cpp from './runners/clang_cpp';
 import zig from './runners/zig';
 import wat from './runners/wat';
 import rust from './runners/rust';
@@ -61,7 +63,9 @@ class InWasmReadExit extends Error { }
 
 const COMPILER_RUNNERS: { [key: string]: CompilerRunner } = {
   'C': emscripten_c,
+  'C++': emscripten_cpp,
   'Clang-C': clang_c,
+  'Clang-C++': clang_cpp,
   'Zig': zig,
   'wat': wat,
   'Rust': rust,
