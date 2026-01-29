@@ -95,7 +95,7 @@ export interface IWasmDefinitionAsyncInstance extends IWasmDefinitionAsync {
 
 
 // dummy type to carry forward definition type info on BYTES
-export interface IWasmBytes<T extends IWasmDefinition> extends Uint8Array { }
+export interface IWasmBytes<T extends IWasmDefinition> extends Uint8Array<ArrayBuffer> { }
 
 // dummy type to carry forward definition type info on MODULE
 export interface IWasmModule<T extends IWasmDefinition> extends WebAssemblyExtended.Module { }
@@ -297,7 +297,7 @@ export interface _IWasmCtx {
 
 
 // runtime helper - decode base64
-function _dec(s: string): Uint8Array {
+function _dec(s: string): Uint8Array<ArrayBuffer> {
   if (typeof Buffer !== 'undefined') return Buffer.from(s, 'base64');
   const bs = atob(s);
   const r = new Uint8Array(bs.length);
