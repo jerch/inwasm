@@ -13,7 +13,7 @@ export const doubled = InWasm({
     switches: ['-Clink-args="-z stack-size=0"']
   },
   code: `
-  #[no_mangle]
+  #[unsafe(no_mangle)]
   pub extern "C" fn doubled(x: i32) -> i32 {
     x * 2
   }
