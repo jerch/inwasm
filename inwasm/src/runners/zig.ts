@@ -35,8 +35,9 @@ export default function(def: IWasmDefinition, buildDir: string, filename: string
   if (def.compile && def.compile.switches) {
     switches.push(...def.compile.switches);
   }
-
-  const call = `${getZigBinary()} build-lib ${src} -target wasm32-freestanding -dynamic -O ReleaseFast ${ff} ${switches.join(' ')}`;
+  // for older zig version pre v0.12.0:
+  //const call = `${getZigBinary()} build-lib ${src} -target wasm32-freestanding -dynamic -O ReleaseFast ${ff} ${switches.join(' ')}`;
+  const call = `${getZigBinary()} build-exe ${src} -target wasm32-freestanding -fno-entry ${ff} ${switches.join(' ')} -O ReleaseFast`;
   console.log(`\n[zig.run] ${call}`);
   execSync(call, { shell: SHELL, stdio: 'inherit' });
   console.log(`\n[zig.run] wasm-strip ${target}`);
