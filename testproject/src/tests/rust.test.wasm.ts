@@ -88,14 +88,14 @@ describe('rust', () => {
         code: `
         static mut SOME_STATIC: [i32; 10] = [0; 10];
         #[no_mangle]
-        pub extern fn store(pos: usize, value: i32) {
+        pub extern "C" fn store(pos: usize, value: i32) {
           match pos {
             0..=9 => unsafe { SOME_STATIC[pos] = value; },
             _ => (),
           }
         }
         #[no_mangle]
-        pub extern fn load(pos: usize) -> i32 {
+        pub extern "C" fn load(pos: usize) -> i32 {
           match pos {
             0..=9 => unsafe { SOME_STATIC[pos] },
             _ => 0,
@@ -126,14 +126,14 @@ describe('rust', () => {
         code: `
         static mut SOME_STATIC: [i32; 10] = [0; 10];
         #[no_mangle]
-        pub extern fn store(pos: usize, value: i32) {
+        pub extern "C" fn store(pos: usize, value: i32) {
           match pos {
             0..=9 => unsafe { SOME_STATIC[pos] = value; },
             _ => (),
           }
         }
         #[no_mangle]
-        pub extern fn load(pos: usize) -> i32 {
+        pub extern "C" fn load(pos: usize) -> i32 {
           match pos {
             0..=9 => unsafe { SOME_STATIC[pos] },
             _ => 0,

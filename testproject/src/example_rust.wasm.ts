@@ -14,7 +14,7 @@ export const doubled = InWasm({
   },
   code: `
   #[no_mangle]
-  pub extern fn doubled(x: i32) -> i32 {
+  pub extern "C" fn doubled(x: i32) -> i32 {
     x * 2
   }
   `
