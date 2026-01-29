@@ -10,10 +10,8 @@ on:
     branches: [ "master" ]
 
 jobs:
-  build:
-
+  install-linux:
     runs-on: ubuntu-latest
-
     strategy:
       matrix:
         node-version: [20.x, 22.x, 24.x]
@@ -34,25 +32,6 @@ jobs:
     - name: Run testproject tests
       run: cd testproject && npm test
 
-  install-linux:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version: [24.x]
-        # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
-
-    steps:
-    - uses: actions/checkout@v3
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v3
-      with:
-        node-version: ${{ matrix.node-version }}
-    - run: rustup target add wasm32-unknown-unknown
-    - run: rm -rf inwasm
-    - run: cd testproject && ./install_fix.sh && npm install
-    - run: cd testproject && npm run inwasm # should re-run custom runner
-    - run: cd testproject && npm test
-
   install-macos:
     runs-on: macos-latest
     strategy:
@@ -67,10 +46,13 @@ jobs:
       with:
         node-version: ${{ matrix.node-version }}
     - run: rustup target add wasm32-unknown-unknown
-    - run: rm -rf inwasm
-    - run: cd testproject && ./install_fix.sh && npm install
+    - run: cd inwasm && npm install
+    - name: inwasm type tests
+      run: cd inwasm && npm run test-types
+    - run: cd testproject && npm install
     - run: cd testproject && npm run inwasm # should re-run custom runner
-    - run: cd testproject && npm test
+    - name: Run testproject tests
+      run: cd testproject && npm test
 
   build-windows:
 
