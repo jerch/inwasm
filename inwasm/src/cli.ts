@@ -131,6 +131,8 @@ function getStackFrame(callstack: IStackFrameInfo[], filename: string): IStackFr
       if (callstack[i - 1] && callstack[i - 1].at === 'InWasm') return callstack[i];
     }
   }
+  console.log(callstack);
+  console.log(filename);
   throw new Error('error finding distinct InWasm call from callstack');
 }
 
@@ -379,7 +381,7 @@ async function processFile(filename: string, id: string) {
           + `       "${wdef.definition.name}" is duplicated in "${filename}".`);
       }
       // get stack position, error if we dont make any progress
-      const stackFrame = getStackFrame(parseCallStack(wdef.stack), filename);
+      const stackFrame = getStackFrame(parseCallStack(wdef.stack), pathToFileURL(filename).toString());
       if (lastStackFrame.line === stackFrame.line && lastStackFrame.column === stackFrame.column) {
         throw new Error(`unable to parse/compile InWasm call at ${filename}:${stackFrame.line}:${stackFrame.column}`);
       }
