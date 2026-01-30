@@ -6,8 +6,6 @@ import {
 } from './index.js';
 
 
-// TODO: test imports type
-
 /**
  * Basic InWasm return types.
  */

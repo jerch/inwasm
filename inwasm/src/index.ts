@@ -101,7 +101,6 @@ export interface IWasmBytes<T extends IWasmDefinition> extends Uint8Array<ArrayB
 export interface IWasmModule<T extends IWasmDefinition> extends WebAssemblyExtended.Module { }
 
 // extends WebAssembly.Instance with proper exports typings
-// FIXME: needs better memory story (not always exported)
 export interface IWasmInstance<T extends IWasmDefinition> extends WebAssemblyExtended.Instance {
   exports: T['exports'];
 }

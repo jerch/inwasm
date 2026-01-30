@@ -73,7 +73,6 @@ export const DEFAULT_CONFIG: IConfig = {
  * Return inwasm's application path.
  */
 function getAppRoot(): string {
-  // FIXME: needs ESM patch
   let folder = __dirname;
   let found = '';
   while (folder !== path.dirname(folder)) {
@@ -113,7 +112,6 @@ export const PROJECT_ROOT = getProjectRoot();
 
 
 function loadConfig(filename: string): IConfig {
-  // FIXME: needs ESM shim
   return require(filename);
 }
 

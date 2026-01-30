@@ -100,7 +100,6 @@ function localZigBinary(basePath: string): string {
  * The call evals the config settings and may try to install
  * the Zig sdk as stated from the config.
  */
-// FIXME: windows support, test on macos
 export function getZigBinary(): string {
   const zigConf = CONFIG.zig as any;
   if (zigConf && zigConf.hasOwnProperty('binary')) {

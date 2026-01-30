@@ -42,11 +42,10 @@ export default function(def: IWasmDefinition, buildDir: string, filename: string
     switches.push(...def.compile.switches);
   }
 
-  // FIXME:
   switches.push(...['-s ERROR_ON_UNDEFINED_SYMBOLS=0', '-s WARN_ON_UNDEFINED_SYMBOLS=0']);
 
   const funcs = `-s EXPORTED_FUNCTIONS=${_funcs}`;
-  // FIXME: for unknown reason windows shell cannot find emcc, thus give path explicitly
+  // for unknown reason windows shell cannot find emcc, thus give path explicitly
   const bin = isPosix ? 'emcc' : path.join(getEmscriptenPath(), 'upstream', 'emscripten', 'emcc.bat');
   const call = `${bin} ${opt} ${defines} ${funcs} ${switches.join(' ')} --no-entry ${src} -o ${target}`;
   console.log(`\n[c.run] ${call}`);

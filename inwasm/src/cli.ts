@@ -127,9 +127,12 @@ function parseCallStack(callstack: string): IStackFrameInfo[] {
  */
 function getStackFrame(callstack: IStackFrameInfo[], filename: string): IStackFrameInfo {
   if (!isPosix) {
-    const filename2 = filename.replaceAll('\\', '/');
+    // windows quirk:
+    // in commonjs the stack frame unit stays path\to\file
+    // while in ESM it turns to file://path/to/file
+    const fileSlashed = filename.replaceAll('\\', '/');
     for (let i = 0; i < callstack.length; ++i) {
-      if (callstack[i].unit.indexOf(filename) !== -1 || callstack[i].unit.indexOf(filename2) !== -1) {
+      if (callstack[i].unit.indexOf(filename) !== -1 || callstack[i].unit.indexOf(fileSlashed) !== -1) {
         if (callstack[i - 1] && callstack[i - 1].at === 'InWasm') return callstack[i];
       }
     }
@@ -140,8 +143,6 @@ function getStackFrame(callstack: IStackFrameInfo[], filename: string): IStackFr
       }
     }
   }
-  console.log(callstack);
-  console.log(filename);
   throw new Error('error finding distinct InWasm call from callstack');
 }
 
@@ -347,7 +348,6 @@ function createRuntimeDefinition(wasm: Buffer, wdef: IWasmSourceDefinition): str
 /**
  * Load module `filename` as ES6 module.
  */
-// TODO...
 async function loadModuleES6(filename: string) {
   const modulePath = pathToFileURL(path.resolve(filename));
   const randStr = Math.random().toString(36).replace(/[^a-z]+/g, '').slice(0, 5);
@@ -374,8 +374,6 @@ async function processFile(filename: string, id: string) {
   while (true) {
     // load module - may fill UNITS with next discovered definitions
     UNITS.length = 0;
-    // TODO: ES6 module loading support
-    //loadModule(filename);
     await loadModuleES6(filename);
 
     // done if the module does not throw InWasmReadExit anymore
