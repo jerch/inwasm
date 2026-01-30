@@ -1,8 +1,8 @@
-import * as fs from 'fs';
-import * as path from 'path';
-import { emscriptenRun, getEmscriptenPath } from '../sdks/emscripten';
-import { IMemorySettings, IWasmDefinition } from '..';
-import { isPosix } from '../config';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { emscriptenRun, getEmscriptenPath } from '../sdks/emscripten.js';
+import type { IMemorySettings, IWasmDefinition } from '../index.js';
+import { isPosix } from '../config.js';
 
 
 export default function(def: IWasmDefinition, buildDir: string, filename: string, memorySettings: IMemorySettings): Uint8Array {

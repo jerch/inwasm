@@ -1,9 +1,9 @@
-import { APP_ROOT, PROJECT_ROOT, CONFIG, isPosix, SHELL } from '../config';
-import * as cp from 'child_process';
-import * as path from 'path';
-import * as fs from 'fs';
-import { rmFolder } from '../helper';
-import { createHash } from 'crypto';
+import * as cp from 'node:child_process';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
+import { createHash } from 'node:crypto';
+import { APP_ROOT, PROJECT_ROOT, CONFIG, isPosix, SHELL } from '../config.js';
+import { rmFolder } from '../helper.js';
 
 
 function sha256(content: Buffer) {  

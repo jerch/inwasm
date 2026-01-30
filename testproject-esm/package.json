@@ -1,0 +1,36 @@
+{
+  "name": "testproject",
+  "version": "0.0.1",
+  "description": "wasm/emscripten with typescript and npm bundling test",
+  "main": "./lib/index.js",
+  "scripts": {
+    "test": "inwasm lib/tests/*.wasm.js && mocha lib/tests/*.test.wasm.js",
+    "tsc": "tsc",
+    "watch": "tsc -w & inwasm -w 'lib/*.wasm.js' & wait",
+    "start": "npm run bundle && http-server",
+    "prepublish": "npm run build",
+    "inwasm": "inwasm lib/*.wasm.js",
+    "bundle": "tsc && inwasm lib/*.wasm.js && webpack",
+    "clean": "rm -rf lib dist inwasm-builds",
+    "build": "npm run bundle"
+  },
+  "type": "module",
+  "repository": "https://github.com/jerch/wasm-dummy",
+  "author": "Joerg Breitbart <j.breitbart@netzkolchose.de>",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^24.10.9",
+    "http-server": "^14.1.1",
+    "mocha": "^11.7.5",
+    "source-map-loader": "^5.0.0",
+    "source-map-support": "^0.5.21",
+    "typescript": "^5.9.3",
+    "wasm-check": "^2.1.2",
+    "webpack": "^5.73.0",
+    "webpack-cli": "^6.0.1"
+  },
+  "dependencies": {
+    "inwasm": "file:../inwasm"
+  }
+}

@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
-    "target": "es2022",
     "module": "nodenext",
+    "target": "es2022",
     "moduleResolution": "nodenext",
     "rootDir": "src",
     "outDir": "lib",
@@ -9,12 +9,11 @@
     "declaration": true,
     "noImplicitAny": true,
     "strict": true,
-    "removeComments": false
+    "removeComments": false,
   },
   "exclude": [
     "node_modules",
     "lib",
-    "lib-cjs",
-    "src-cjs"
+    "inwasm-sdks"
   ]
 }

@@ -4,19 +4,36 @@
   "description": "Inline WebAssembly.",
   "main": "./lib/index.js",
   "types": "./lib/index.d.ts",
+  "type": "module",
   "bin": {
     "inwasm": "./lib/cli.js"
+  },
+  "exports": {
+    "./lib/mocha_shim": {
+      "import": "./lib/mocha_shim.js",
+      "require": "./lib/mocha_shim.cjs",
+      "types": "./lib/mocha_shim.d.ts"
+    },
+    ".": {
+      "import": "./lib/index.js",
+      "require": "./lib/index.cjs",
+      "types": "./lib/index.d.ts"
+    }
   },
   "scripts": {
     "test": "mocha lib/*.test.js",
     "test-types": "cp src/index.test-d.ts lib && tsd",
     "tsc": "tsc",
+    "create-cjs": "mkdir -p src-cjs && cp src/index.ts src/mocha_shim.ts src-cjs/",
+    "tsc-cjs": "tsc --project tsconfig.cjs.json",
+    "copy-cjs": "cp lib-cjs/index.js lib/index.cjs && cp lib-cjs/mocha_shim.js lib/mocha_shim.cjs",
+    "cjs": "npm run create-cjs && npm run tsc-cjs && npm run copy-cjs",
     "watch": "tsc -w",
-    "prepare": "npm run tsc",
+    "prepare": "npm run build",
     "prepack": "cp ../README.md .",
     "postpack": "rm README.md",
-    "clean": "rm -rf lib",
-    "build": "tsc"
+    "clean": "rm -rf lib lib-cjs src-cjs",
+    "build": "npm run tsc && npm run cjs"
   },
   "repository": {
     "type": "git",

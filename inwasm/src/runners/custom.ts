@@ -1,4 +1,4 @@
-import { IMemorySettings, IWasmDefinition } from '..';
+import type { IMemorySettings, IWasmDefinition } from '../index.js';
 
 
 export default async function(def: IWasmDefinition, buildDir: string, filename: string, memorySettings: IMemorySettings): Promise<Uint8Array> {

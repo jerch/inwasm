@@ -1,9 +1,9 @@
-import * as fs from 'fs';
-import * as path from 'path';
-import { execSync } from 'child_process';
-import { IMemorySettings, IWasmDefinition } from '..';
-import { SHELL, WABT_TOOL, isPosix } from '../config';
-import { rmFolder } from '../helper';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { execSync } from 'node:child_process';
+import type { IMemorySettings, IWasmDefinition } from '../index.js';
+import { SHELL, WABT_TOOL } from '../config.js';
+import { rmFolder } from '../helper.js';
 
 
 export default function(def: IWasmDefinition, buildDir: string, filename: string, memorySettings: IMemorySettings): Uint8Array {

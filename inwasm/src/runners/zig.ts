@@ -1,8 +1,8 @@
-import * as fs from 'fs';
-import { execSync } from 'child_process';
-import { getZigBinary } from '../sdks/zig';
-import { IMemorySettings, IWasmDefinition } from '..';
-import { SHELL, WABT_TOOL } from '../config';
+import * as fs from 'node:fs';
+import { execSync } from 'node:child_process';
+import { getZigBinary } from '../sdks/zig.js';
+import type { IMemorySettings, IWasmDefinition } from '../index.js';
+import { SHELL, WABT_TOOL } from '../config.js';
 
 
 export default function(def: IWasmDefinition, buildDir: string, filename: string, memorySettings: IMemorySettings): Uint8Array {

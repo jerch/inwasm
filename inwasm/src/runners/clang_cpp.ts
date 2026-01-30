@@ -1,9 +1,9 @@
-import * as fs from 'fs';
-import * as path from 'path';
-import { emscriptenRun, getClangBinPath } from '../sdks/emscripten';
-import { IMemorySettings, IWasmDefinition } from '..';
-import { execSync } from 'child_process';
-import { SHELL, WABT_TOOL } from '../config';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { execSync } from 'node:child_process';
+import { emscriptenRun, getClangBinPath } from '../sdks/emscripten.js';
+import type { IMemorySettings, IWasmDefinition } from '../index.js';
+import { SHELL, WABT_TOOL } from '../config.js';
 
 
 /**

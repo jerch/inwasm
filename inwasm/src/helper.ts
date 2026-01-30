@@ -1,6 +1,5 @@
-import * as fs from 'fs';
-import * as path from 'path';
-import { IMemorySettings, IWasmDefinition } from '.';
+import * as fs from 'node:fs';
+import type { IMemorySettings, IWasmDefinition } from './index.js';
 
 
 export function rmFolder(p: string) {

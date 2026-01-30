@@ -1,9 +1,9 @@
-import * as path from 'path';
-import * as fs from 'fs';
-import * as cp from 'child_process';
-import { rmFolder } from '../helper';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
+import * as cp from 'node:child_process';
+import { rmFolder } from '../helper.js';
 
-import { APP_ROOT, PROJECT_ROOT, CONFIG, SHELL, isPosix } from '../config';
+import { APP_ROOT, PROJECT_ROOT, CONFIG, SHELL, isPosix } from '../config.js';
 
 
 /**
