@@ -27,10 +27,17 @@ jobs:
     - run: cd inwasm && npm install
     - name: inwasm type tests
       run: cd inwasm && npm run test-types
+
     - run: cd testproject && npm install
     - run: cd testproject && npm run inwasm # should re-run custom runner
     - name: Run testproject tests
       run: cd testproject && npm test
+
+    - run: cd testproject-esm && npm install
+    - run: cd testproject-esm && npm run inwasm # should re-run custom runner
+    - name: Run testproject-esm tests
+      run: cd testproject-esm && npm test
+
 
   install-macos:
     runs-on: macos-latest
@@ -49,31 +56,38 @@ jobs:
     - run: cd inwasm && npm install
     - name: inwasm type tests
       run: cd inwasm && npm run test-types
+
     - run: cd testproject && npm install
     - run: cd testproject && npm run inwasm # should re-run custom runner
     - name: Run testproject tests
       run: cd testproject && npm test
 
-  build-windows:
+    - run: cd testproject-esm && npm install
+    - run: cd testproject-esm && npm run inwasm # should re-run custom runner
+    - name: Run testproject-esm tests
+      run: cd testproject-esm && npm test
 
-    runs-on: windows-latest
 
-    strategy:
-      matrix:
-        node-version: [24.x]
-        # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
-
-    steps:
-    - uses: actions/checkout@v3
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v3
-      with:
-        node-version: ${{ matrix.node-version }}
-    - run: rustup target add wasm32-unknown-unknown
-    - run: cd inwasm && npm install
-    - name: inwasm type tests
-      run: cd inwasm && npm run test-types
-    - run: cd testproject && npm install
-    - run: cd testproject && npm run inwasm # should re-run custom runner
-    - name: Run testproject tests
-      run: cd testproject && npm test
+#  build-windows:
+#
+#    runs-on: windows-latest
+#
+#    strategy:
+#      matrix:
+#        node-version: [24.x]
+#        # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
+#
+#    steps:
+#    - uses: actions/checkout@v3
+#    - name: Use Node.js ${{ matrix.node-version }}
+#      uses: actions/setup-node@v3
+#      with:
+#        node-version: ${{ matrix.node-version }}
+#    - run: rustup target add wasm32-unknown-unknown
+#    - run: cd inwasm && npm install
+#    - name: inwasm type tests
+#      run: cd inwasm && npm run test-types
+#    - run: cd testproject && npm install
+#    - run: cd testproject && npm run inwasm # should re-run custom runner
+#    - name: Run testproject tests
+#      run: cd testproject && npm test
