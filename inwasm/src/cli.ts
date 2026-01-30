@@ -312,7 +312,7 @@ async function compileWasm(def: IWasmDefinition, filename: string, srcDef: strin
   execSync(call, { shell: SHELL, stdio: 'inherit' });
 
   console.log(green('[inwasm compile]'), `Successfully built '${def.name}' (${formatBytes(result.length)}).\n`);
-  if (result.length > 4095 && def.mode === OutputMode.SYNC && def.type !== OutputType.BYTES) {
+  if (result.length > 8000000 && def.mode === OutputMode.SYNC && def.type !== OutputType.BYTES) {
     console.log(yellow('[inwasm compile]'), `Warning: The generated wasm unit '${def.name}'`);
     console.log('                 will most likely not work in browser main context.\n');
   }
