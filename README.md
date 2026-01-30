@@ -138,7 +138,7 @@ there are some coding restrictions:
 
 ... WIP, more config settings yet to come, env overrides still partially broken ...
 
-With a file `inwasm.config.js` in your project root you can configure some settings of `inwasm`:
+With a file `inwasm.config.cjs` in your project root you can configure some settings of `inwasm`:
 
 ```javascript
 // default - autoinstall zig and emsdk
@@ -325,9 +325,10 @@ are currently really bare metal, this might even involve writing your own consol
 
 ### Development
 
-The source repo contains two node package folders:
+The source repo contains three node package folders:
 - `/inwasm` - inwasm package with cli tool and definitions
 - `/testproject` - main test package for different compiler runners/SDKs
+- `/testproject-esm` - main ESM test package for different compiler runners/SDKs
 
 Since `/testproject` depends on `/inwasm`, initialize in this order:
 ```bash
@@ -344,8 +345,6 @@ npm install
 
 ### TODO
 
-- ESM support
-- more tests
 - option to write to different file
 - better docs
 

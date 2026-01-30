@@ -2,6 +2,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { pathToFileURL } from 'url';
 import { randomBytes, createHash } from 'node:crypto';
 import { execSync } from 'node:child_process';
 import { type IWasmDefinition, type CompilerRunner, type _IWasmCtx, OutputMode, OutputType } from './index.js';
@@ -25,10 +26,6 @@ import wat from './runners/wat.js';
 import rust from './runners/rust.js';
 import custom from './runners/custom.js';
 import { extractMemorySettings } from './helper.js';
-
-import { createRequire } from 'node:module';
-
-const require = createRequire(import.meta.url);
 
 
 console.log(green('[inwasm config]'), 'used configration:');
@@ -337,28 +334,11 @@ function createRuntimeDefinition(wasm: Buffer, wdef: IWasmSourceDefinition): str
 
 
 /**
- * Load module `filename` as node module.
- */
-function loadModule(filename: string) {
-  try {
-    const modulePath = path.resolve(filename);
-    delete require.cache[require.resolve(modulePath)];
-    require(modulePath);
-  } catch (e) {
-    if (!(e instanceof InWasmReadExit)) {
-      console.log('error during module require:', e);
-      return;
-    }
-  }
-}
-
-
-/**
  * Load module `filename` as ES6 module.
  */
 // TODO...
 async function loadModuleES6(filename: string) {
-  const modulePath = path.resolve(filename);
+  const modulePath = pathToFileURL(path.resolve(filename));
   const randStr = Math.random().toString(36).replace(/[^a-z]+/g, '').slice(0, 5);
   await import(modulePath + `?bogus=${randStr}`).catch(e => {
     if (!(e instanceof InWasmReadExit)) {
