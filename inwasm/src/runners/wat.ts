@@ -10,7 +10,10 @@ export default function(def: IWasmDefinition, buildDir: string, filename: string
   const src = `${def.name}.wat`;
   const target = `${def.name}.wasm`;
   fs.writeFileSync(src, def.code);
-  const call = `${WABT_TOOL.wat2wasm} ${src} && ${WABT_TOOL['wasm-strip']} ${target}`;
+  const call = `${WABT_TOOL.wat2wasm} ${src}`;
+  console.log(`\n[wat.run] ${call}`);
   execSync(call, { shell: SHELL, stdio: 'inherit' });
+  console.log(`\n[wat.run] wasm-strip ${target}`);
+  execSync(`${WABT_TOOL['wasm-strip']} "${target}"`, { shell: SHELL, stdio: 'inherit' });
   return fs.readFileSync(target);
 }

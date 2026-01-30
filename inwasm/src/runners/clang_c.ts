@@ -2,6 +2,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { emscriptenRun, getClangBinPath } from '../sdks/emscripten';
 import { IMemorySettings, IWasmDefinition } from '..';
+import { execSync } from 'child_process';
+import { SHELL, WABT_TOOL } from '../config';
 
 
 /**
@@ -58,6 +60,9 @@ export default function(def: IWasmDefinition, buildDir: string, filename: string
     .join(',');
   const clang = path.join(getClangBinPath(), 'clang');
   const call = `${clang} --target=wasm32-unknown-unknown --no-standard-libraries -Wl,${ff} -Wl,--no-entry -Wl,--lto-O3 ${opt} ${switches.join(' ')} -flto ${defines} -o ${target} ${src}`;
+  console.log(`\n[clang_c.run] ${call}`);
   emscriptenRun(call);
+  console.log(`\n[clang_c.run] wasm-strip ${target}`);
+  execSync(`${WABT_TOOL['wasm-strip']} "${target}"`, { shell: SHELL, stdio: 'inherit' });
   return fs.readFileSync(target);
 }

@@ -49,6 +49,7 @@ export default function(def: IWasmDefinition, buildDir: string, filename: string
   // FIXME: for unknown reason windows shell cannot find emcc, thus give path explicitly
   const bin = isPosix ? 'em++' : path.join(getEmscriptenPath(), 'upstream', 'emscripten', 'em++.bat');
   const call = `${bin} ${opt} ${defines} ${funcs} ${switches.join(' ')} --no-entry ${src} -o ${target}`;
+  console.log(`\n[cpp.run] ${call}`);
   emscriptenRun(call);
   return fs.readFileSync(target);
 }
