@@ -24,7 +24,7 @@
     "test": "mocha lib/*.test.js",
     "test-types": "cp src/index.test-d.ts lib && tsd",
     "tsc": "tsc",
-    "create-cjs": "mkdir -p src-cjs && cp src/index.ts src/mocha_shim.ts src-cjs/",
+    "create-cjs": "node create-cjs.js",
     "tsc-cjs": "tsc --project tsconfig.cjs.json",
     "copy-cjs": "cp lib-cjs/index.js lib/index.cjs && cp lib-cjs/mocha_shim.js lib/mocha_shim.cjs",
     "cjs": "npm run create-cjs && npm run tsc-cjs && npm run copy-cjs",
