@@ -126,6 +126,9 @@ function parseCallStack(callstack: string): IStackFrameInfo[] {
  * and has no further indirection.
  */
 function getStackFrame(callstack: IStackFrameInfo[], filename: string): IStackFrameInfo {
+  if (!isPosix) {
+    filename = filename.replaceAll('/', '\\');
+  }
   for (let i = 0; i < callstack.length; ++i) {
     if (callstack[i].unit.indexOf(filename) !== -1) {
       if (callstack[i - 1] && callstack[i - 1].at === 'InWasm') return callstack[i];
@@ -381,7 +384,7 @@ async function processFile(filename: string, id: string) {
           + `       "${wdef.definition.name}" is duplicated in "${filename}".`);
       }
       // get stack position, error if we dont make any progress
-      const stackFrame = getStackFrame(parseCallStack(wdef.stack), pathToFileURL(filename).toString());
+      const stackFrame = getStackFrame(parseCallStack(wdef.stack), filename);
       if (lastStackFrame.line === stackFrame.line && lastStackFrame.column === stackFrame.column) {
         throw new Error(`unable to parse/compile InWasm call at ${filename}:${stackFrame.line}:${stackFrame.column}`);
       }
