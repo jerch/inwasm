@@ -127,11 +127,17 @@ function parseCallStack(callstack: string): IStackFrameInfo[] {
  */
 function getStackFrame(callstack: IStackFrameInfo[], filename: string): IStackFrameInfo {
   if (!isPosix) {
-    filename = filename.replaceAll('/', '\\');
-  }
-  for (let i = 0; i < callstack.length; ++i) {
-    if (callstack[i].unit.indexOf(filename) !== -1) {
-      if (callstack[i - 1] && callstack[i - 1].at === 'InWasm') return callstack[i];
+    const filename2 = filename.replaceAll('\\', '/');
+    for (let i = 0; i < callstack.length; ++i) {
+      if (callstack[i].unit.indexOf(filename) !== -1 || callstack[i].unit.indexOf(filename2) !== -1) {
+        if (callstack[i - 1] && callstack[i - 1].at === 'InWasm') return callstack[i];
+      }
+    }
+  } else {
+    for (let i = 0; i < callstack.length; ++i) {
+      if (callstack[i].unit.indexOf(filename) !== -1) {
+        if (callstack[i - 1] && callstack[i - 1].at === 'InWasm') return callstack[i];
+      }
     }
   }
   console.log(callstack);
