@@ -148,8 +148,6 @@ there are some coding restrictions:
 
 ### Config Options
 
-... WIP, more config settings yet to come, env overrides still partially broken ...
-
 With a file `inwasm.config.cjs` in your project root you can configure some settings of `inwasm`:
 
 ```javascript
@@ -320,9 +318,9 @@ with these node cmdline switches:
 - Threads (--experimental-wasm-threads)
 - Type reflection (--experimental-wasm-type-reflection)
 
-Currently the compiler runners are not yet fully prepared to apply additional wasm features correctly
-to all build steps and thus might break for certain non-default features. This will be sorted out with
-the next PRs.
+Currently the compiler runners are not yet fully prepared to apply all known additional wasm features
+correctly to all build steps and thus might break for certain non-default features.
+Please open an issue if you find something crucial missing.
 
 
 ### Testing with `InWasm`
@@ -348,25 +346,33 @@ The source repo contains three node package folders:
 - `/testproject` - main test package for different compiler runners/SDKs
 - `/testproject-esm` - main ESM test package for different compiler runners/SDKs
 
-Since `/testproject` depends on `/inwasm`, initialize in this order:
+Since test projects depends on `/inwasm`, initialize in this order:
 ```bash
 git clone https://github.com/jerch/inwasm.git
 
 # setup inwasm first
 cd inwasm/inwasm
 npm install
+npm run tgz
 
-# then the testproject
+# then the testprojects
 cd ../testproject
 npm install
+cd ../testproject-esm
+npm install
 ```
-
-### TODO
-
-- option to write to different file
-- better docs
 
 
 ### State
 
-Still alpha, use at your own risk. Tested to work on Linux, macOS and Windows.
+Beta, tested on recent versions of Linux, macOS and Windows with Node 20, 22 & 24.
+
+
+### Changelog
+
+- 0.1.0 - first beta release
+  - package upgrades
+  - C++ runners
+  - ESM support (cli itself is ESM now)
+  - parent and path directive for SDKs
+  - isolated runtime package

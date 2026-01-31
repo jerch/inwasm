@@ -1,7 +1,7 @@
 {
   "name": "inwasm-runtime",
-  "version": "0.0.13",
-  "description": "Inline WebAssembly.",
+  "version": "0.1.0",
+  "description": "Inline WebAssembly, runtime only.",
   "main": "./lib/index.js",
   "types": "./lib/index.d.ts",
   "type": "module",
