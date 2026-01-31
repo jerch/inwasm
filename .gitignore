@@ -19,9 +19,11 @@
 /testproject/dist
 /testproject/inwasm-sdks
 /testproject/inwasm-builds
+/testproject/package-lock.json
 
 /testproject-esm/node_modules
 /testproject-esm/lib
 /testproject-esm/dist
 /testproject-esm/inwasm-sdks
 /testproject-esm/inwasm-builds
+/testproject-esm/package-lock.json
