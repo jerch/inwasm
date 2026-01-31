@@ -370,6 +370,8 @@ Beta, tested on recent versions of Linux, macOS and Windows with Node 20, 22 & 2
 
 ### Changelog
 
+- 0.1.1
+  - fix watch mode
 - 0.1.0 - first beta release
   - package upgrades
   - C++ runners
