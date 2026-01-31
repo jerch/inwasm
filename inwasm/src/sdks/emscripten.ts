@@ -1,3 +1,8 @@
+/**
+ * Copyright (c) 2022, 2026 Joerg Breitbart
+ * @license MIT
+ */
+
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import * as cp from 'node:child_process';

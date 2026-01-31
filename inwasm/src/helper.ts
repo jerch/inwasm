@@ -1,3 +1,8 @@
+/**
+ * Copyright (c) 2022 Joerg Breitbart
+ * @license MIT
+ */
+
 import * as fs from 'node:fs';
 import type { IMemorySettings, IWasmDefinition } from './index.js';
 

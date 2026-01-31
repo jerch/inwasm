@@ -1,4 +1,9 @@
 /**
+ * Copyright (c) 2022, 2026 Joerg Breitbart
+ * @license MIT
+ */
+
+/**
  * Output type of `InWasm`.
  * Determines whether to return bytes, a wasm module or a wasm instance.
  * Returns for async corresponding promises.

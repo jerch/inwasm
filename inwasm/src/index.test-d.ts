@@ -1,3 +1,8 @@
+/**
+ * Copyright (c) 2022 Joerg Breitbart
+ * @license MIT
+ */
+
 import { expectType } from 'tsd';
 import {
   type ExtractDefinition, InWasm, type IWasmBytes, type IWasmInstance,

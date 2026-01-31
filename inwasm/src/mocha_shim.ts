@@ -1,3 +1,8 @@
+/**
+ * Copyright (c) 2022, 2026 Joerg Breitbart
+ * @license MIT
+ */
+
 declare let describe: any;
 declare let it: any;
 

@@ -1,5 +1,10 @@
 #!/usr/bin/env node
 
+/**
+ * Copyright (c) 2022, 2026 Joerg Breitbart
+ * @license MIT
+ */
+
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { pathToFileURL } from 'url';
