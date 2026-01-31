@@ -1,10 +1,10 @@
 module.exports = {
   zig: {
     version: 'master',
-    store: 'project'
+    store: 'path:../'
   },
-  // TODO...
-  //emsdk: {
-  //  ...
-  //}
+  emsdk: {
+    version: 'latest',
+    store: 'path:../'
+  }
 };

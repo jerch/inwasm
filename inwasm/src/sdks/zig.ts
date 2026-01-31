@@ -7,7 +7,7 @@ import * as cp from 'node:child_process';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { createHash } from 'node:crypto';
-import { APP_ROOT, PROJECT_ROOT, CONFIG, isPosix, SHELL } from '../config.js';
+import { APP_ROOT, PROJECT_ROOT, CONFIG, isPosix, SHELL, getSdkRoot } from '../config.js';
 import { rmFolder } from '../helper.js';
 
 
@@ -120,7 +120,8 @@ export function getZigBinary(): string {
   if (!version) throw new Error(`zig version ${zigConf.version} not found for your system`);
 
   // from autoinstalled
-  const basePath = path.join(zigConf.store === 'inwasm' ? APP_ROOT : PROJECT_ROOT, 'inwasm-sdks', 'zig');
+  const root = getSdkRoot(zigConf.store);
+  const basePath = path.join(root, 'inwasm-sdks', 'zig');
   const localZig = localZigBinary(basePath);
   if (fs.existsSync(basePath) && fs.existsSync(localZig)) {
     const installed = cp.execSync(`${localZig} version`, { encoding: 'utf-8' }).trim();

@@ -175,6 +175,12 @@ module.exports = {
   },
 };
 ```
+`zig.store` and `emsdk.store` support the following values:
+- `'project'` - store SDKs in the package folder (default)
+- `'inwasm'` - store SDks in the inwasm package (useful for global installs)
+- `'parent:package_name'` - store SDKs in parent package folder (inspects package.json for the name)
+- `'path:path_to_folder'` - store SDKs in given folder (relative or absolute)
+
 For on-the-fly config overrides it is possible to use env variables,
 where the name of the env variable is derived from the config object keys:
 ```bash

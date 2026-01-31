@@ -274,7 +274,7 @@ async function compileWasm(def: IWasmDefinition, filename: string, srcDef: strin
   const memorySettings = extractMemorySettings(def);
 
   // create build folders
-  const baseDir = path.resolve('./inwasm-builds');
+  const baseDir = path.resolve(path.join(PROJECT_ROOT, 'inwasm-builds'));
   if (!fs.existsSync(baseDir)) {
     fs.mkdirSync(baseDir);
   }

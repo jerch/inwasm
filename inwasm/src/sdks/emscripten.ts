@@ -8,7 +8,7 @@ import * as fs from 'node:fs';
 import * as cp from 'node:child_process';
 import { rmFolder } from '../helper.js';
 
-import { APP_ROOT, PROJECT_ROOT, CONFIG, SHELL, isPosix } from '../config.js';
+import { APP_ROOT, PROJECT_ROOT, CONFIG, SHELL, isPosix, getSdkRoot } from '../config.js';
 
 
 /**
@@ -26,7 +26,8 @@ export function getEmscriptenPath(): string {
   }
 
   // from autoinstalled
-  const basePath = path.join(emsdkConf.store === 'inwasm' ? APP_ROOT : PROJECT_ROOT, 'inwasm-sdks', 'emsdk');
+  const root = getSdkRoot(emsdkConf.store);
+  const basePath = path.join(root, 'inwasm-sdks', 'emsdk');
   if (fs.existsSync(basePath) && fs.existsSync(path.join(basePath, 'emsdk.py'))) {
     return basePath;
   }

@@ -2,6 +2,7 @@
 /lib/
 /node_modules/
 /.vscode
+/inwasm-sdks
 
 /inwasm/node_modules
 /inwasm/lib
