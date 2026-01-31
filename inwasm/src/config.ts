@@ -127,6 +127,16 @@ export const PROJECT_ROOT = getProjectRoot();
 
 
 /**
+ * Determine whether .js means ESM or CommonJS in package.json.
+ */
+function getPackageType(): string {
+  const content = fs.readFileSync(path.join(PROJECT_ROOT, 'package.json'), { encoding: 'utf-8' });
+  return JSON.parse(content).type ?? 'commonjs';
+}
+export const JS_IS_ESM = getPackageType() === 'module';
+
+
+/**
  * Return array of parent package folders.
  */
 function getParentFolder(): { name: string; folder: string; }[] {
