@@ -1,9 +1,14 @@
-import { APP_ROOT, PROJECT_ROOT, CONFIG, isPosix, SHELL } from '../config';
-import * as cp from 'child_process';
-import * as path from 'path';
-import * as fs from 'fs';
-import { rmFolder } from '../helper';
-import { createHash } from 'crypto';
+/**
+ * Copyright (c) 2022, 2026 Joerg Breitbart
+ * @license MIT
+ */
+
+import * as cp from 'node:child_process';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
+import { createHash } from 'node:crypto';
+import { APP_ROOT, PROJECT_ROOT, CONFIG, isPosix, SHELL, getSdkRoot } from '../config.js';
+import { rmFolder } from '../helper.js';
 
 
 function sha256(content: Buffer) {  
@@ -100,7 +105,6 @@ function localZigBinary(basePath: string): string {
  * The call evals the config settings and may try to install
  * the Zig sdk as stated from the config.
  */
-// FIXME: windows support, test on macos
 export function getZigBinary(): string {
   const zigConf = CONFIG.zig as any;
   if (zigConf && zigConf.hasOwnProperty('binary')) {
@@ -116,7 +120,8 @@ export function getZigBinary(): string {
   if (!version) throw new Error(`zig version ${zigConf.version} not found for your system`);
 
   // from autoinstalled
-  const basePath = path.join(zigConf.store === 'inwasm' ? APP_ROOT : PROJECT_ROOT, 'inwasm-sdks', 'zig');
+  const root = getSdkRoot(zigConf.store);
+  const basePath = path.join(root, 'inwasm-sdks', 'zig');
   const localZig = localZigBinary(basePath);
   if (fs.existsSync(basePath) && fs.existsSync(localZig)) {
     const installed = cp.execSync(`${localZig} version`, { encoding: 'utf-8' }).trim();

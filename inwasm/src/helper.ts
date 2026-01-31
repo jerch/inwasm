@@ -1,6 +1,10 @@
-import * as fs from 'fs';
-import * as path from 'path';
-import { IMemorySettings, IWasmDefinition } from '.';
+/**
+ * Copyright (c) 2022 Joerg Breitbart
+ * @license MIT
+ */
+
+import * as fs from 'node:fs';
+import type { IMemorySettings, IWasmDefinition } from './index.js';
 
 
 export function rmFolder(p: string) {

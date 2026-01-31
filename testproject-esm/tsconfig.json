@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "module": "nodenext",
+    "target": "es2022",
+    "moduleResolution": "nodenext",
+    "rootDir": "src",
+    "outDir": "lib",
+    "sourceMap": true,
+    "declaration": true,
+    "noImplicitAny": true,
+    "strict": true,
+    "removeComments": false,
+  },
+  "exclude": [
+    "node_modules",
+    "lib",
+    "inwasm-sdks"
+  ]
+}

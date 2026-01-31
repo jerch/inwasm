@@ -2,15 +2,29 @@
 /lib/
 /node_modules/
 /.vscode
+/inwasm-sdks
 
-/inwasm/node_modules/
+/inwasm/node_modules
 /inwasm/lib
 /inwasm/dist
 /inwasm/emsdk
 /inwasm/inwasm-sdks
+/inwasm/lib-cjs
+/inwasm/src-cjs
+/inwasm/*tgz
+/inwasm/runtime/lib
+/inwasm/runtime/*.tgz
 
-/testproject/node_modules/
+/testproject/node_modules
 /testproject/lib
 /testproject/dist
 /testproject/inwasm-sdks
 /testproject/inwasm-builds
+/testproject/package-lock.json
+
+/testproject-esm/node_modules
+/testproject-esm/lib
+/testproject-esm/dist
+/testproject-esm/inwasm-sdks
+/testproject-esm/inwasm-builds
+/testproject-esm/package-lock.json

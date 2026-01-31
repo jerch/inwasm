@@ -1,4 +1,9 @@
 /**
+ * Copyright (c) 2022, 2026 Joerg Breitbart
+ * @license MIT
+ */
+
+/**
  * Output type of `InWasm`.
  * Determines whether to return bytes, a wasm module or a wasm instance.
  * Returns for async corresponding promises.
@@ -37,7 +42,7 @@ export interface IWasmDefinition {
   imports?: WebAssembly.Imports;
   memoryDescriptor?: WebAssembly.MemoryDescriptor;
   // whether to treat `code` below as C or C++ source.
-  srctype: 'C' | 'C++' | 'Clang-C' | 'Zig' | 'wat' | 'custom' | 'Rust';
+  srctype: 'C' | 'C++' | 'Clang-C' | 'Clang-C++' | 'Zig' | 'wat' | 'custom' | 'Rust';
   // custom compiler settings
   compile?: {
     // Custom cmdline defines, e.g. {ABC: 123} provided as -DABC=123 to the compiler.
@@ -95,13 +100,12 @@ export interface IWasmDefinitionAsyncInstance extends IWasmDefinitionAsync {
 
 
 // dummy type to carry forward definition type info on BYTES
-export interface IWasmBytes<T extends IWasmDefinition> extends Uint8Array { }
+export interface IWasmBytes<T extends IWasmDefinition> extends Uint8Array<ArrayBuffer> { }
 
 // dummy type to carry forward definition type info on MODULE
 export interface IWasmModule<T extends IWasmDefinition> extends WebAssemblyExtended.Module { }
 
 // extends WebAssembly.Instance with proper exports typings
-// FIXME: needs better memory story (not always exported)
 export interface IWasmInstance<T extends IWasmDefinition> extends WebAssemblyExtended.Instance {
   exports: T['exports'];
 }
@@ -297,7 +301,7 @@ export interface _IWasmCtx {
 
 
 // runtime helper - decode base64
-function _dec(s: string): Uint8Array {
+function _dec(s: string): Uint8Array<ArrayBuffer> {
   if (typeof Buffer !== 'undefined') return Buffer.from(s, 'base64');
   const bs = atob(s);
   const r = new Uint8Array(bs.length);

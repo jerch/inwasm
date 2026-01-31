@@ -1,8 +1,15 @@
+/**
+ * Copyright (c) 2022 Joerg Breitbart
+ * @license MIT
+ */
+
 import { expectType } from 'tsd';
-import { ExtractDefinition, InWasm, IWasmBytes, IWasmInstance, IWasmModule, IWasmResponse, OutputMode, OutputType, WebAssemblyExtended } from './';
+import {
+  type ExtractDefinition, InWasm, type IWasmBytes, type IWasmInstance,
+  type IWasmModule, type IWasmResponse,
+  OutputMode, OutputType, WebAssemblyExtended
+} from './index.js';
 
-
-// TODO: test imports type
 
 /**
  * Basic InWasm return types.

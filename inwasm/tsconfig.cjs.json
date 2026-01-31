@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "module": "CommonJS",
+    "target": "es2022",
+    "rootDir": "src-cjs",
+    "outDir": "lib-cjs",
+    "sourceMap": true,
+    "declaration": true,
+    "noImplicitAny": true,
+    "strict": true,
+    "removeComments": false
+  },
+  "exclude": [
+    "node_modules",
+    "lib",
+    "lib-cjs",
+    "src",
+    "runtime"
+  ]
+}

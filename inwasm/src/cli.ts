@@ -1,10 +1,16 @@
 #!/usr/bin/env node
 
-import * as fs from 'fs';
-import * as path from 'path';
-import { randomBytes, createHash } from 'crypto';
-import { execSync } from 'child_process';
-import { IWasmDefinition, CompilerRunner, _IWasmCtx, OutputMode, OutputType } from '.';
+/**
+ * Copyright (c) 2022, 2026 Joerg Breitbart
+ * @license MIT
+ */
+
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { pathToFileURL } from 'url';
+import { randomBytes, createHash } from 'node:crypto';
+import { execSync } from 'node:child_process';
+import { type IWasmDefinition, type CompilerRunner, type _IWasmCtx, OutputMode, OutputType } from './index.js';
 
 import * as chokidar from 'chokidar';
 import { globSync, hasMagic } from 'glob';
@@ -13,16 +19,18 @@ import * as acorn from 'acorn';
 import * as walk from 'acorn-walk';
 
 import { green, yellow } from 'colorette';
-import { APP_ROOT, PROJECT_ROOT, CONFIG, SHELL, isPosix, WABT_TOOL } from './config';
+import { APP_ROOT, PROJECT_ROOT, CONFIG, SHELL, isPosix, WABT_TOOL } from './config.js';
 
 // compiler runners
-import emscripten_c from './runners/emscripten_c';
-import clang_c from './runners/clang_c';
-import zig from './runners/zig';
-import wat from './runners/wat';
-import rust from './runners/rust';
-import custom from './runners/custom';
-import { extractMemorySettings } from './helper';
+import emscripten_c from './runners/emscripten_c.js';
+import emscripten_cpp from './runners/emscripten_cpp.js';
+import clang_c from './runners/clang_c.js';
+import clang_cpp from './runners/clang_cpp.js';
+import zig from './runners/zig.js';
+import wat from './runners/wat.js';
+import rust from './runners/rust.js';
+import custom from './runners/custom.js';
+import { extractMemorySettings } from './helper.js';
 
 
 console.log(green('[inwasm config]'), 'used configration:');
@@ -61,7 +69,9 @@ class InWasmReadExit extends Error { }
 
 const COMPILER_RUNNERS: { [key: string]: CompilerRunner } = {
   'C': emscripten_c,
+  'C++': emscripten_cpp,
   'Clang-C': clang_c,
+  'Clang-C++': clang_cpp,
   'Zig': zig,
   'wat': wat,
   'Rust': rust,
@@ -121,9 +131,21 @@ function parseCallStack(callstack: string): IStackFrameInfo[] {
  * and has no further indirection.
  */
 function getStackFrame(callstack: IStackFrameInfo[], filename: string): IStackFrameInfo {
-  for (let i = 0; i < callstack.length; ++i) {
-    if (callstack[i].unit.indexOf(filename) !== -1) {
-      if (callstack[i - 1] && callstack[i - 1].at === 'InWasm') return callstack[i];
+  if (!isPosix) {
+    // windows quirk:
+    // in commonjs the stack frame unit stays path\to\file
+    // while in ESM it turns to file://path/to/file
+    const fileSlashed = filename.replaceAll('\\', '/');
+    for (let i = 0; i < callstack.length; ++i) {
+      if (callstack[i].unit.indexOf(filename) !== -1 || callstack[i].unit.indexOf(fileSlashed) !== -1) {
+        if (callstack[i - 1] && callstack[i - 1].at === 'InWasm') return callstack[i];
+      }
+    }
+  } else {
+    for (let i = 0; i < callstack.length; ++i) {
+      if (callstack[i].unit.indexOf(filename) !== -1) {
+        if (callstack[i - 1] && callstack[i - 1].at === 'InWasm') return callstack[i];
+      }
     }
   }
   throw new Error('error finding distinct InWasm call from callstack');
@@ -138,7 +160,7 @@ function getStackFrame(callstack: IStackFrameInfo[], filename: string): IStackFr
  * - check for single node argument of type ObjectExpression, otherwise throw
  */
 function identifyDefinitionBlock(stackFrame: IStackFrameInfo, content: string): acorn.Node {
-  const ast = acorn.parse(content, { locations: true, ecmaVersion: 'latest' });
+  const ast = acorn.parse(content, { locations: true, ecmaVersion: 'latest', sourceType: 'module' });
   const calls: acorn.Node[] = [];
   walk.simple(ast, {
     CallExpression(node) {
@@ -252,7 +274,7 @@ async function compileWasm(def: IWasmDefinition, filename: string, srcDef: strin
   const memorySettings = extractMemorySettings(def);
 
   // create build folders
-  const baseDir = path.resolve('./inwasm-builds');
+  const baseDir = path.resolve(path.join(PROJECT_ROOT, 'inwasm-builds'));
   if (!fs.existsSync(baseDir)) {
     fs.mkdirSync(baseDir);
   }
@@ -308,7 +330,7 @@ async function compileWasm(def: IWasmDefinition, filename: string, srcDef: strin
   execSync(call, { shell: SHELL, stdio: 'inherit' });
 
   console.log(green('[inwasm compile]'), `Successfully built '${def.name}' (${formatBytes(result.length)}).\n`);
-  if (result.length > 4095 && def.mode === OutputMode.SYNC && def.type !== OutputType.BYTES) {
+  if (result.length > 8000000 && def.mode === OutputMode.SYNC && def.type !== OutputType.BYTES) {
     console.log(yellow('[inwasm compile]'), `Warning: The generated wasm unit '${def.name}'`);
     console.log('                 will most likely not work in browser main context.\n');
   }
@@ -329,29 +351,10 @@ function createRuntimeDefinition(wasm: Buffer, wdef: IWasmSourceDefinition): str
 
 
 /**
- * Load module `fielname` as node module.
- */
-function loadModule(filename: string) {
-  try {
-    // FIXME: needs ES6 patch
-    const modulePath = path.resolve(filename);
-    delete require.cache[require.resolve(modulePath)];
-    require(modulePath);
-  } catch (e) {
-    if (!(e instanceof InWasmReadExit)) {
-      console.log('error during module require:', e);
-      return;
-    }
-  }
-}
-
-
-/**
  * Load module `filename` as ES6 module.
  */
-// TODO...
 async function loadModuleES6(filename: string) {
-  const modulePath = path.resolve(filename);
+  const modulePath = pathToFileURL(path.resolve(filename));
   const randStr = Math.random().toString(36).replace(/[^a-z]+/g, '').slice(0, 5);
   await import(modulePath + `?bogus=${randStr}`).catch(e => {
     if (!(e instanceof InWasmReadExit)) {
@@ -376,9 +379,7 @@ async function processFile(filename: string, id: string) {
   while (true) {
     // load module - may fill UNITS with next discovered definitions
     UNITS.length = 0;
-    // TODO: ES6 module loading support
-    loadModule(filename);
-    //await loadModuleES6(filename);
+    await loadModuleES6(filename);
 
     // done if the module does not throw InWasmReadExit anymore
     if (!UNITS.length) break;
@@ -431,7 +432,7 @@ function reprocessSkipped(filename: string, id: string): boolean {
 
   // collect comments from source
   const comments: any[] = [];
-  acorn.parse(content, { locations: true, ecmaVersion: 'latest', onComment: comments });
+  acorn.parse(content, { locations: true, ecmaVersion: 'latest', onComment: comments, sourceType: 'module' });
 
   const reval: {[key: string]: {start: number, end: number, src: string}} = {};
 

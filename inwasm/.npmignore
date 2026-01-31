@@ -1,3 +1,9 @@
 src
 tsconfig.json
+tsconfig.cjs.json
 inwasm-sdks
+src-cjs
+lib-cjs
+create-cjs.js
+lib/index.test-*
+runtime

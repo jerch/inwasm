@@ -10,13 +10,11 @@ on:
     branches: [ "master" ]
 
 jobs:
-  build:
-
+  linux:
     runs-on: ubuntu-latest
-
     strategy:
       matrix:
-        node-version: [14.x, 16.x, 18.x]
+        node-version: [20.x, 22.x, 24.x]
         # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
 
     steps:
@@ -29,35 +27,26 @@ jobs:
     - run: cd inwasm && npm install
     - name: inwasm type tests
       run: cd inwasm && npm run test-types
+    
+    - name: generate tgz
+      run: cd inwasm && npm run tgz
+
     - run: cd testproject && npm install
     - run: cd testproject && npm run inwasm # should re-run custom runner
     - name: Run testproject tests
       run: cd testproject && npm test
 
-  install-linux:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version: [18.x]
-        # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
+    - run: cd testproject-esm && npm install
+    - run: cd testproject-esm && npm run inwasm # should re-run custom runner
+    - name: Run testproject-esm tests
+      run: cd testproject-esm && npm test
 
-    steps:
-    - uses: actions/checkout@v3
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v3
-      with:
-        node-version: ${{ matrix.node-version }}
-    - run: rustup target add wasm32-unknown-unknown
-    - run: rm -rf inwasm
-    - run: cd testproject && ./install_fix.sh && npm install
-    - run: cd testproject && npm run inwasm # should re-run custom runner
-    - run: cd testproject && npm test
 
-  install-macos:
+  macos:
     runs-on: macos-latest
     strategy:
       matrix:
-        node-version: [18.x]
+        node-version: [24.x]
         # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
 
     steps:
@@ -67,18 +56,31 @@ jobs:
       with:
         node-version: ${{ matrix.node-version }}
     - run: rustup target add wasm32-unknown-unknown
-    - run: rm -rf inwasm
-    - run: cd testproject && ./install_fix.sh && npm install
-    - run: cd testproject && npm run inwasm # should re-run custom runner
-    - run: cd testproject && npm test
+    - run: cd inwasm && npm install
+    - name: inwasm type tests
+      run: cd inwasm && npm run test-types
 
-  build-windows:
+    - name: generate tgz
+      run: cd inwasm && npm run tgz
+
+    - run: cd testproject && npm install
+    - run: cd testproject && npm run inwasm # should re-run custom runner
+    - name: Run testproject tests
+      run: cd testproject && npm test
+
+    - run: cd testproject-esm && npm install
+    - run: cd testproject-esm && npm run inwasm # should re-run custom runner
+    - name: Run testproject-esm tests
+      run: cd testproject-esm && npm test
+
+
+  windows:
 
     runs-on: windows-latest
 
     strategy:
       matrix:
-        node-version: [18.x]
+        node-version: [24.x]
         # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
 
     steps:
@@ -91,7 +93,16 @@ jobs:
     - run: cd inwasm && npm install
     - name: inwasm type tests
       run: cd inwasm && npm run test-types
+
+    - name: generate tgz
+      run: cd inwasm && npm run tgz
+
     - run: cd testproject && npm install
     - run: cd testproject && npm run inwasm # should re-run custom runner
     - name: Run testproject tests
       run: cd testproject && npm test
+
+    - run: cd testproject-esm && npm install
+    - run: cd testproject-esm && npm run inwasm # should re-run custom runner
+    - name: Run testproject-esm tests
+      run: cd testproject-esm && npm test

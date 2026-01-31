@@ -1,8 +1,13 @@
-import * as fs from 'fs';
-import * as path from 'path';
-import { emscriptenRun, getEmscriptenPath } from '../sdks/emscripten';
-import { IMemorySettings, IWasmDefinition } from '..';
-import { isPosix } from '../config';
+/**
+ * Copyright (c) 2022, 2026 Joerg Breitbart
+ * @license MIT
+ */
+
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { emscriptenRun, getEmscriptenPath } from '../sdks/emscripten.js';
+import type { IMemorySettings, IWasmDefinition } from '../index.js';
+import { isPosix } from '../config.js';
 
 
 export default function(def: IWasmDefinition, buildDir: string, filename: string, memorySettings: IMemorySettings): Uint8Array {
@@ -42,13 +47,13 @@ export default function(def: IWasmDefinition, buildDir: string, filename: string
     switches.push(...def.compile.switches);
   }
 
-  // FIXME:
   switches.push(...['-s ERROR_ON_UNDEFINED_SYMBOLS=0', '-s WARN_ON_UNDEFINED_SYMBOLS=0']);
 
   const funcs = `-s EXPORTED_FUNCTIONS=${_funcs}`;
-  // FIXME: for unknown reason windows shell cannot find emcc, thus give path explicitly
+  // for unknown reason windows shell cannot find emcc, thus give path explicitly
   const bin = isPosix ? 'emcc' : path.join(getEmscriptenPath(), 'upstream', 'emscripten', 'emcc.bat');
   const call = `${bin} ${opt} ${defines} ${funcs} ${switches.join(' ')} --no-entry ${src} -o ${target}`;
+  console.log(`\n[c.run] ${call}`);
   emscriptenRun(call);
   return fs.readFileSync(target);
 }

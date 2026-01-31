@@ -1,8 +1,13 @@
-import * as fs from 'fs';
-import { execSync } from 'child_process';
-import { getZigBinary } from '../sdks/zig';
-import { IMemorySettings, IWasmDefinition } from '..';
-import { SHELL, WABT_TOOL } from '../config';
+/**
+ * Copyright (c) 2022, 2026 Joerg Breitbart
+ * @license MIT
+ */
+
+import * as fs from 'node:fs';
+import { execSync } from 'node:child_process';
+import { getZigBinary } from '../sdks/zig.js';
+import type { IMemorySettings, IWasmDefinition } from '../index.js';
+import { SHELL, WABT_TOOL } from '../config.js';
 
 
 export default function(def: IWasmDefinition, buildDir: string, filename: string, memorySettings: IMemorySettings): Uint8Array {
@@ -35,8 +40,9 @@ export default function(def: IWasmDefinition, buildDir: string, filename: string
   if (def.compile && def.compile.switches) {
     switches.push(...def.compile.switches);
   }
-
-  const call = `${getZigBinary()} build-lib ${src} -target wasm32-freestanding -dynamic -O ReleaseFast ${ff} ${switches.join(' ')}`;
+  // for older zig version pre v0.12.0:
+  //const call = `${getZigBinary()} build-lib ${src} -target wasm32-freestanding -dynamic -O ReleaseFast ${ff} ${switches.join(' ')}`;
+  const call = `${getZigBinary()} build-exe ${src} -target wasm32-freestanding -fno-entry ${ff} ${switches.join(' ')} -O ReleaseFast`;
   console.log(`\n[zig.run] ${call}`);
   execSync(call, { shell: SHELL, stdio: 'inherit' });
   console.log(`\n[zig.run] wasm-strip ${target}`);

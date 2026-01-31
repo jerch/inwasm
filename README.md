@@ -1,10 +1,22 @@
 ## InWasm - Inline WebAssembly for Typescript.
 
 InWasm is a small bundler for inline standalone wasm libraries. It compiles and bundles
-the wasm source code inplace. Example with Typescript:
+the wasm source code inplace.
+
+### Installation
+
+```bash
+npm install inwasm-runtime      # provides InWasm() and type definitions 
+npm install --save-dev inwasm   # provides inwasm cli for compiling
+```
+
+## Usage
+
+Example with Typescript:
+
 ```typescript
 // src/xy.wasm.ts
-import { InWasm, OutputMode, OutputType } from 'inwasm';
+import { InWasm, OutputMode, OutputType } from 'inwasm-runtime';
 
 const getAdderInstance = InWasm({
   name: 'adder',
@@ -88,14 +100,13 @@ and/or rust with wasm-bindgen.
 
 Source Types (`srctype`):
 - `'C'` - emscripten C, compiled as standalone wasm
+- `'C++'` - emscripten C++, compiled as standalone wasm
 - `'Clang-C'` - using clang from emscripten SDK
+- `'Clang-C++'` - using clang++ from emscripten SDK
 - `'Zig'` - preinstalled or autoinstall, compiled as freestanding
 - `'wat'` - compiled with wat2wasm
 - `'Rust'` - must be preinstalled currently with `cargo` in PATH
 - `'custom'` - any custom build script
-
-... TODO: document srctype extensions on wasm definitions, C++ runners ...
-
 
 Output Types (`type`):
 - `BYTES` - Uint8Array (raw wasm bytes), typed as `IWasmBytes<T extends IWasmDefinition>`
@@ -139,7 +150,7 @@ there are some coding restrictions:
 
 ... WIP, more config settings yet to come, env overrides still partially broken ...
 
-With a file `inwasm.config.js` in your project root you can configure some settings of `inwasm`:
+With a file `inwasm.config.cjs` in your project root you can configure some settings of `inwasm`:
 
 ```javascript
 // default - autoinstall zig and emsdk
@@ -164,6 +175,12 @@ module.exports = {
   },
 };
 ```
+`zig.store` and `emsdk.store` support the following values:
+- `'project'` - store SDKs in the package folder (default)
+- `'inwasm'` - store SDks in the inwasm package (useful for global installs)
+- `'parent:package_name'` - store SDKs in parent package folder (inspects package.json for the name)
+- `'path:path_to_folder'` - store SDKs in given folder (relative or absolute)
+
 For on-the-fly config overrides it is possible to use env variables,
 where the name of the env variable is derived from the config object keys:
 ```bash
@@ -326,9 +343,10 @@ are currently really bare metal, this might even involve writing your own consol
 
 ### Development
 
-The source repo contains two node package folders:
+The source repo contains three node package folders:
 - `/inwasm` - inwasm package with cli tool and definitions
 - `/testproject` - main test package for different compiler runners/SDKs
+- `/testproject-esm` - main ESM test package for different compiler runners/SDKs
 
 Since `/testproject` depends on `/inwasm`, initialize in this order:
 ```bash
@@ -345,8 +363,6 @@ npm install
 
 ### TODO
 
-- ESM support
-- more tests
 - option to write to different file
 - better docs
 

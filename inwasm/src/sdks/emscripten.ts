@@ -1,9 +1,14 @@
-import * as path from 'path';
-import * as fs from 'fs';
-import * as cp from 'child_process';
-import { rmFolder } from '../helper';
+/**
+ * Copyright (c) 2022, 2026 Joerg Breitbart
+ * @license MIT
+ */
 
-import { APP_ROOT, PROJECT_ROOT, CONFIG, SHELL, isPosix } from '../config';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
+import * as cp from 'node:child_process';
+import { rmFolder } from '../helper.js';
+
+import { APP_ROOT, PROJECT_ROOT, CONFIG, SHELL, isPosix, getSdkRoot } from '../config.js';
 
 
 /**
@@ -21,7 +26,8 @@ export function getEmscriptenPath(): string {
   }
 
   // from autoinstalled
-  const basePath = path.join(emsdkConf.store === 'inwasm' ? APP_ROOT : PROJECT_ROOT, 'inwasm-sdks', 'emsdk');
+  const root = getSdkRoot(emsdkConf.store);
+  const basePath = path.join(root, 'inwasm-sdks', 'emsdk');
   if (fs.existsSync(basePath) && fs.existsSync(path.join(basePath, 'emsdk.py'))) {
     return basePath;
   }
@@ -58,7 +64,6 @@ export function getClangBinPath(): string {
  */
 export function emscriptenRun(cmd: string) {
   const sdkPath = getEmscriptenPath();
-  console.log(`\n[emscripten.run] ${cmd}`);
   const sdk = isPosix
     ? `source ${path.join(sdkPath, 'emsdk_env.sh')} > /dev/null 2>&1`
     : `${path.join(sdkPath, 'emsdk_env.bat')} >nul 2>&1`;

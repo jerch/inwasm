@@ -1,13 +1,35 @@
-import * as path from 'path';
-import * as fs from 'fs';
-import { execSync } from 'child_process';
+/**
+ * Copyright (c) 2022, 2026 Joerg Breitbart
+ * @license MIT
+ */
+
+import * as path from 'node:path';
+import * as fs from 'node:fs';
+import { execSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 
 /**
- * Whether to store compiler sdks in the project or
- * globally in the inwasm app folder.
+ * Where to store compiler sdks.
  * This only applies to auto install mode.
+ *
+ * Values:
+ *  - `inwasm`
+ *    - store SDks in the inwasm package
+ *  - `project`
+ *    - store SDKs in the package folder
+ *  - `parent:package_name`
+ *    - store SDKs in parent package folder
+ *      (inspects package.json for the name)
+ *  - `path:path_to_folder`
+ *    - store SDKs in given folder (relative or absolute)
  */
-export type StoreLocation = 'inwasm' | 'project';
+export type StoreLocation = 'inwasm' | 'project' | string;
 
 // FIXME: needs better type layout for easier interaction on sdk side
 export interface IConfig {
@@ -67,7 +89,6 @@ export const DEFAULT_CONFIG: IConfig = {
  * Return inwasm's application path.
  */
 function getAppRoot(): string {
-  // FIXME: needs ESM patch
   let folder = __dirname;
   let found = '';
   while (folder !== path.dirname(folder)) {
@@ -105,9 +126,55 @@ function getProjectRoot(): string {
 export const PROJECT_ROOT = getProjectRoot();
 
 
+/**
+ * Return array of parent package folders.
+ */
+function getParentFolder(): { name: string; folder: string; }[] {
+  const parents: { name: string; folder: string; }[] = [];
+  let folder = PROJECT_ROOT;
+  while (folder !== path.dirname(folder)) {
+    if (fs.existsSync(path.join(folder, 'package.json'))) {
+      const content = fs.readFileSync(path.join(folder, 'package.json'), { encoding: 'utf-8' });
+      const name = JSON.parse(content).name;
+      parents.push({name, folder});
+    }
+    folder = path.dirname(folder);
+  }
+  return parents;
+}
+export const PARENT_PACKAGES = getParentFolder();
+
+
+/**
+ * Get the SDK store root path from a StoreLocation entry;
+ */
+export function getSdkRoot(store: StoreLocation): string {
+  let root = '';
+  if (store.startsWith('parent:')) {
+    const name = store.slice(7);
+    for (let i = 0; i < PARENT_PACKAGES.length; ++i) {
+      if (PARENT_PACKAGES[i].name === name) {
+        root = PARENT_PACKAGES[i].folder;
+        return root;
+      }
+    }
+    if (!root) throw new Error(`cannot determine SDK path for "${store}"`);
+  }
+  if (store.startsWith('path:')) {
+    root = store.slice(5);
+    if (!path.isAbsolute(root)) {
+      root = path.join(PROJECT_ROOT, root);
+    }
+    root = path.resolve(root);
+    if (!fs.existsSync(root)) {
+      fs.mkdirSync(root, { recursive: true });
+    }
+    return root;
+  }
+  return root = store === 'inwasm' ? APP_ROOT : PROJECT_ROOT;
+}
 
 function loadConfig(filename: string): IConfig {
-  // FIXME: needs ESM shim
   return require(filename);
 }
 
@@ -120,7 +187,9 @@ function merge(target: IConfig, custom: IConfig): IConfig {
   if (isObj(target) && isObj(custom)) {
     for (const key in custom) {
       if (isObj(custom[key])) {
-        Object.assign(target, { [key]: {} });
+        if (!isObj(target[key])) {
+          Object.assign(target, { [key]: {} });
+        }
         merge(target[key], custom[key]);
       } else {
         Object.assign(target, { [key]: custom[key] });
@@ -142,8 +211,11 @@ function getEnvOverrides(): { [key: string]: any } {
     let o = result;
     for (let k = 0; k < path.length; ++k) {
       const lower = path[k].toLowerCase();
-      if (k === path.length - 1) o[lower] = value;
-      else o[lower] = {};
+      if (k === path.length - 1) {
+        o[lower] = value;
+      } else {
+        if (!o[lower]) o[lower] = {};
+      }
       o = o[lower];
     }
   }
@@ -161,7 +233,7 @@ function getConfig(): IConfig {
   const final: IConfig = Object.assign({}, DEFAULT_CONFIG);
 
   // merge with config from file
-  const configFile = path.join(PROJECT_ROOT, 'inwasm.config.js');
+  const configFile = path.join(PROJECT_ROOT, 'inwasm.config.cjs');
   if (fs.existsSync(configFile)) {
     merge(final, loadConfig(configFile));
   }

@@ -1,7 +1,14 @@
-import * as fs from 'fs';
-import * as path from 'path';
-import { emscriptenRun, getClangBinPath } from '../sdks/emscripten';
-import { IMemorySettings, IWasmDefinition } from '..';
+/**
+ * Copyright (c) 2022, 2026 Joerg Breitbart
+ * @license MIT
+ */
+
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { execSync } from 'node:child_process';
+import { emscriptenRun, getClangBinPath } from '../sdks/emscripten.js';
+import type { IMemorySettings, IWasmDefinition } from '../index.js';
+import { SHELL, WABT_TOOL } from '../config.js';
 
 
 /**
@@ -58,6 +65,9 @@ export default function(def: IWasmDefinition, buildDir: string, filename: string
     .join(',');
   const clang = path.join(getClangBinPath(), 'clang');
   const call = `${clang} --target=wasm32-unknown-unknown --no-standard-libraries -Wl,${ff} -Wl,--no-entry -Wl,--lto-O3 ${opt} ${switches.join(' ')} -flto ${defines} -o ${target} ${src}`;
+  console.log(`\n[clang_c.run] ${call}`);
   emscriptenRun(call);
+  console.log(`\n[clang_c.run] wasm-strip ${target}`);
+  execSync(`${WABT_TOOL['wasm-strip']} "${target}"`, { shell: SHELL, stdio: 'inherit' });
   return fs.readFileSync(target);
 }
