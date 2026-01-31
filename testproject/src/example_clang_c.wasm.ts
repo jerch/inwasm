@@ -1,4 +1,4 @@
-import { InWasm, OutputMode, OutputType } from 'inwasm';
+import { InWasm, OutputMode, OutputType } from 'inwasm-runtime';
 
 
 const importObj = {

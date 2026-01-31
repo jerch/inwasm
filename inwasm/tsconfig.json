@@ -15,6 +15,7 @@
     "node_modules",
     "lib",
     "lib-cjs",
-    "src-cjs"
+    "src-cjs",
+    "runtime"
   ]
 }

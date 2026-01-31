@@ -1,10 +1,22 @@
 ## InWasm - Inline WebAssembly for Typescript.
 
 InWasm is a small bundler for inline standalone wasm libraries. It compiles and bundles
-the wasm source code inplace. Example with Typescript:
+the wasm source code inplace.
+
+### Installation
+
+```bash
+npm install inwasm-runtime      # provides InWasm() and type definitions 
+npm install --save-dev inwasm   # provides inwasm cli for compiling
+```
+
+## Usage
+
+Example with Typescript:
+
 ```typescript
 // src/xy.wasm.ts
-import { InWasm, OutputMode, OutputType } from 'inwasm';
+import { InWasm, OutputMode, OutputType } from 'inwasm-runtime';
 
 const getAdderInstance = InWasm({
   name: 'adder',

@@ -32,8 +32,9 @@
     "prepare": "npm run build",
     "prepack": "cp ../README.md .",
     "postpack": "rm README.md",
-    "clean": "rm -rf lib lib-cjs src-cjs",
-    "build": "npm run tsc && npm run cjs"
+    "clean": "rm -rf lib lib-cjs src-cjs *.tgz runtime/lib runtime/*.tgz",
+    "build": "npm run tsc && npm run cjs",
+    "tgz": "npm pack && cd runtime && npm pack"
   },
   "repository": {
     "type": "git",

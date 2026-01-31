@@ -1,4 +1,4 @@
-import { InWasm, OutputMode, OutputType } from 'inwasm';
+import { InWasm, OutputMode, OutputType } from 'inwasm-runtime';
 
 
 export const wat_adder = InWasm({

@@ -1,4 +1,4 @@
-import { InWasm, OutputMode, OutputType, WebAssemblyExtended } from 'inwasm';
+import { InWasm, OutputMode, OutputType, WebAssemblyExtended } from 'inwasm-runtime';
 
 /**
  * memory calculations:

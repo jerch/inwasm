@@ -1,6 +1,6 @@
 import * as assert from 'node:assert';
 import * as path from 'node:path';
-import { InWasm, OutputMode, OutputType } from 'inwasm';
+import { InWasm, OutputMode, OutputType } from 'inwasm-runtime';
 import { applyMochaShim } from 'inwasm/lib/mocha_shim';
 import { watExportMemory, watImportMemory } from './testhelper.js';
 

@@ -27,6 +27,9 @@ jobs:
     - run: cd inwasm && npm install
     - name: inwasm type tests
       run: cd inwasm && npm run test-types
+    
+    - name: generate tgz
+      run: cd inwasm && npm run tgz
 
     - run: cd testproject && npm install
     - run: cd testproject && npm run inwasm # should re-run custom runner
@@ -56,6 +59,9 @@ jobs:
     - run: cd inwasm && npm install
     - name: inwasm type tests
       run: cd inwasm && npm run test-types
+
+    - name: generate tgz
+      run: cd inwasm && npm run tgz
 
     - run: cd testproject && npm install
     - run: cd testproject && npm run inwasm # should re-run custom runner
@@ -87,6 +93,9 @@ jobs:
     - run: cd inwasm && npm install
     - name: inwasm type tests
       run: cd inwasm && npm run test-types
+
+    - name: generate tgz
+      run: cd inwasm && npm run tgz
 
     - run: cd testproject && npm install
     - run: cd testproject && npm run inwasm # should re-run custom runner

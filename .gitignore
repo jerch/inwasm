@@ -10,6 +10,9 @@
 /inwasm/inwasm-sdks
 /inwasm/lib-cjs
 /inwasm/src-cjs
+/inwasm/*tgz
+/inwasm/runtime/lib
+/inwasm/runtime/*.tgz
 
 /testproject/node_modules
 /testproject/lib
