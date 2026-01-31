@@ -10,7 +10,7 @@ on:
     branches: [ "master" ]
 
 jobs:
-  install-linux:
+  linux:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -42,7 +42,7 @@ jobs:
       run: cd testproject-esm && npm test
 
 
-  install-macos:
+  macos:
     runs-on: macos-latest
     strategy:
       matrix:
@@ -74,7 +74,7 @@ jobs:
       run: cd testproject-esm && npm test
 
 
-  build-windows:
+  windows:
 
     runs-on: windows-latest
 
