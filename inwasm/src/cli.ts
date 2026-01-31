@@ -10,6 +10,7 @@ import * as path from 'node:path';
 import { pathToFileURL } from 'url';
 import { randomBytes, createHash } from 'node:crypto';
 import { execSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { type IWasmDefinition, type CompilerRunner, type _IWasmCtx, OutputMode, OutputType } from './index.js';
 
 import * as chokidar from 'chokidar';
@@ -19,7 +20,7 @@ import * as acorn from 'acorn';
 import * as walk from 'acorn-walk';
 
 import { green, yellow } from 'colorette';
-import { APP_ROOT, PROJECT_ROOT, CONFIG, SHELL, isPosix, WABT_TOOL } from './config.js';
+import { APP_ROOT, PROJECT_ROOT, CONFIG, SHELL, isPosix, WABT_TOOL, JS_IS_ESM } from './config.js';
 
 // compiler runners
 import emscripten_c from './runners/emscripten_c.js';
@@ -31,6 +32,9 @@ import wat from './runners/wat.js';
 import rust from './runners/rust.js';
 import custom from './runners/custom.js';
 import { extractMemorySettings } from './helper.js';
+
+
+const require = createRequire(import.meta.url);
 
 
 console.log(green('[inwasm config]'), 'used configration:');
@@ -351,17 +355,57 @@ function createRuntimeDefinition(wasm: Buffer, wdef: IWasmSourceDefinition): str
 
 
 /**
+ * Load module `filename` as CommonJS.
+ */
+function loadModule(filename: string) {
+  try {
+    const modulePath = path.resolve(filename);
+    delete require.cache[require.resolve(modulePath)];
+    require(modulePath);
+  } catch (e) {
+    if (!(e instanceof InWasmReadExit)) {
+      console.log('error during module require:', e);
+      return;
+    }
+  }
+}
+
+
+/**
  * Load module `filename` as ES6 module.
  */
 async function loadModuleES6(filename: string) {
   const modulePath = pathToFileURL(path.resolve(filename));
-  const randStr = Math.random().toString(36).replace(/[^a-z]+/g, '').slice(0, 5);
-  await import(modulePath + `?bogus=${randStr}`).catch(e => {
+  try {
+    await import(modulePath.toString() + `?bogus=${randomId(8)}`);
+  } catch (e) {
     if (!(e instanceof InWasmReadExit)) {
       console.log('error during module import:', e);
-      return;
     }
-  })
+  }
+}
+
+
+function isESM(filename: string, code: string): boolean {
+  // mjs and cjs override package.type
+  if (filename.endsWith('.mjs')) return true;
+  if (filename.endsWith('.cjs')) return false;
+  // js depends on package.type
+  if (filename.endsWith('.js')) return JS_IS_ESM;
+  // anything not obeying the extension rules,
+  // try to use acorn to derive the true module type
+  try {
+    acorn.parse(code, { ecmaVersion: 2022, sourceType: 'script' });
+    return false;  // Parsed as valid ESM
+  } catch (e) {
+    // Try CommonJS/script
+    try {
+      acorn.parse(code, { ecmaVersion: 2022, sourceType: 'module' });
+      return true;  // Valid CommonJS
+    } catch {
+      throw new Error('Invalid JS syntax');
+    }
+  }
 }
 
 
@@ -379,7 +423,11 @@ async function processFile(filename: string, id: string) {
   while (true) {
     // load module - may fill UNITS with next discovered definitions
     UNITS.length = 0;
-    await loadModuleES6(filename);
+    if (isESM(filename, content)) {
+      await loadModuleES6(filename);
+    } else {
+      loadModule(filename);
+    }
 
     // done if the module does not throw InWasmReadExit anymore
     if (!UNITS.length) break;
@@ -581,7 +629,7 @@ async function runWatcher(args: string[]) {
   console.log(`Starting watch mode with pattern ${pattern.join(' ')}`);
 
   const fileHashes: {[key: string]: string} = {};
-  chokidar.watch(pattern).on('all', async (event, filename) => {
+  chokidar.watch(pattern, { atomic: true, awaitWriteFinish: true }).on('all', async (event, filename) => {
     if (['add', 'change'].includes(event)) {
       if (sha256(fs.readFileSync(filename)) === fileHashes[filename]) {
         return;
@@ -593,10 +641,7 @@ async function runWatcher(args: string[]) {
         } while (reprocessSkipped(filename, id));
         fileHashes[filename] = sha256(fs.readFileSync(filename));
         updateForeignWatch(filename);
-      } catch (e) {
-        console.error(`Error while processing ${filename}:`);
-        console.log(e);
-      }
+      } catch (e) {}
       console.log('\n\n');
     }
   });

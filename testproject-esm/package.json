@@ -6,7 +6,7 @@
   "scripts": {
     "test": "inwasm lib/tests/*.wasm.js && mocha lib/tests/*.test.wasm.js",
     "tsc": "tsc",
-    "watch": "tsc -w & inwasm -w 'lib/*.wasm.js' & wait",
+    "watch": "tsc -w & inwasm -w lib/*.wasm.js & wait",
     "start": "npm run bundle && http-server",
     "prepublish": "npm run build",
     "inwasm": "inwasm lib/*.wasm.js",
