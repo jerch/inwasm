@@ -21,7 +21,7 @@
     "@types/mocha": "^10.0.10",
     "@types/node": "^24",
     "http-server": "^14.1.1",
-    "inwasm": "file:../inwasm/inwasm-0.0.13.tgz",
+    "inwasm": "file:../inwasm/inwasm-0.1.0.tgz",
     "mocha": "^11.7.5",
     "source-map-loader": "^5.0.0",
     "source-map-support": "^0.5.21",
@@ -31,6 +31,6 @@
     "webpack-cli": "^6.0.1"
   },
   "dependencies": {
-    "inwasm-runtime": "file:../inwasm/runtime/inwasm-runtime-0.0.13.tgz"
+    "inwasm-runtime": "file:../inwasm/runtime/inwasm-runtime-0.1.0.tgz"
   }
 }
