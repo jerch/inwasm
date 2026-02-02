@@ -30,22 +30,21 @@ export const enum OutputMode {
  * Wasm source definition, holds all relevant compiler info.
  */
 export interface IWasmDefinition {
-  // Name of the wasm target, should be unique.
+  /** Name of the wasm target, must be unique within a module. */
   name: string;
-  // Type determines, whether to provide bytes | module | instance at runtime.
+  /** Type determines, whether to provide bytes, module or an instance at runtime. */
   type: OutputType;
-  // Sync (discouraged) vs. async wasm bootstrapping at runtime.
+  /** Sync vs. async wasm bootstrapping at runtime. */
   mode: OutputMode,
-  // Exported wasm functions, for proper TS typing simply stub them.
+  /** Exported wasm functions, for proper TS typing simply stub them. */
   exports: { [key: string]: Function | WebAssembly.Global | WebAssembly.Memory };
-  // Name of the env import object (must be visible at runtime). Only used for OutputType.INSTANCE.
+  /** Stub of import object. Must match the real imports at runtime for OutputType.INSTANCE. */
   imports?: WebAssembly.Imports;
-  memoryDescriptor?: WebAssembly.MemoryDescriptor;
-  // whether to treat `code` below as C or C++ source.
+  /** Determines the compiler runner to be used. */
   srctype: 'C' | 'C++' | 'Clang-C' | 'Clang-C++' | 'Zig' | 'wat' | 'custom' | 'Rust';
-  // custom compiler settings
+  /** Custom compiler settings. */
   compile?: {
-    // Custom cmdline defines, e.g. {ABC: 123} provided as -DABC=123 to the compiler.
+    /** Custom cmdline defines, e.g. {xyz: 123} is provided as -Dxyz=123 to the compiler. */
     defines?: { [key: string]: string | number };
     // Additional include paths, should be absolute. (TODO...)
     // include?: string[];
@@ -53,15 +52,16 @@ export interface IWasmDefinition {
     // sources?: string[];
     // FIXME: check support for -lxy with wasm
     // libs?: string[],
-    // Custom cmdline switches, overriding any from above.
+    /** Custom cmdline switches, overrides any from above. */
     switches?: string[];
   };
+  /** Custom runner for srctype='custom'. */
   customRunner?: CompilerRunner;
-  // Inline source code (C or C++).
+  /** Inline source code. */
   code: string;
-  // Whether to always run compiler runner.
+  /** Whether to always run compiler runner. */
   noCache?: boolean;
-  // List of globbing entries to track additional files.
+  /** List of globbing entries to track additional files for changes. */
   trackChanges?: string[];
   /**
    * Hash mode for file tracking, default is 'mtime'.
@@ -338,9 +338,7 @@ declare const _wasmCtx: _IWasmCtx;
  * After TS compilation run `inwasm` on files containing `InWasm` calls.
  * `inwasm` grabs the source definitions from partial execution, compiles them into
  * wasm binaries and replaces the source definitions with base64 encoded runtime definitions.
- * Note that this currently happens inplace, thus the original file content gets overwritten.
  * Alternatively run `inwasm` in watch mode with `inwasm -w glob*pattern`.
- * Note: `inwasm` does not yet work with ES6 modules.
  *
  * runtime stage\
  * At runtime `InWasm` decodes the base64 wasm data and returns a function returning the
