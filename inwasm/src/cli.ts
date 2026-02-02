@@ -15,6 +15,7 @@ import { type IWasmDefinition, type CompilerRunner, type _IWasmCtx, OutputMode, 
 
 import * as chokidar from 'chokidar';
 import { globSync, hasMagic } from 'glob';
+import { Minimatch } from 'minimatch';
 
 import * as acorn from 'acorn';
 import * as walk from 'acorn-walk';
@@ -619,19 +620,68 @@ function updateForeignWatch(filename: string) {
 
 
 // default glob pattern
-const DEFAULT_GLOB = ['./lib/**/*.wasm.js']
+// TODO: config file entries
+const DEFAULT_GLOB = ['lib/**/*.wasm.js'];
 
+// always exclude filenames containing these subpaths
+const EXCLUDE_FOLDERS = [
+  'node_modules',
+  'inwasm-sdks',
+  'inwasm-builds'
+];
+
+// glob pattern matchers for watch mode
+const globMatchers: Minimatch[] = [];
+
+/**
+ * Test whether a file path from chokidar matches
+ * the glob pattern.
+ */
+function matchesPattern(filename: string): boolean {
+  // glob pattern are relative to project local
+  filename = filename.slice(PROJECT_ROOT.length + 1);
+  for (const mm of globMatchers) {
+    if (mm.match(filename)) return true;
+  }
+  return false;
+}
+
+/**
+ * Ignore filter for watch mode chokidar.
+ * - folders always pass
+ * - file must match one of the glob pattern
+ * - everything else is rejected
+ */
+function ignoreFilter(filename: string): boolean {
+  //
+  try {
+    for (const exclude of EXCLUDE_FOLDERS) {
+      if (filename.includes(exclude)) return true;
+    }
+    if (fs.statSync(filename).isFile()
+      && !matchesPattern(filename)) return true;
+    return false;
+  } catch (e) {}
+  return true;
+}
 
 /**
  * Run in watch mode.
  */
 async function runWatcher(args: string[]) {
-  // FIXME: pattern match got removed from chokidar
   const pattern = args.length ? args : DEFAULT_GLOB;
   console.log(`Starting watch mode with pattern ${pattern.join(' ')}`);
+  for (const pat of pattern) {
+    globMatchers.push(new Minimatch(pat));
+  }
 
   const fileHashes: {[key: string]: string} = {};
-  chokidar.watch(pattern, { atomic: true, awaitWriteFinish: true }).on('all', async (event, filename) => {
+  chokidar.watch(PROJECT_ROOT, {
+    atomic: true,
+    awaitWriteFinish: true,
+    ignored: ignoreFilter,
+    ignoreInitial: true
+  }).on('all', async (event, filename) => {
     if (['add', 'change'].includes(event)) {
       if (sha256(fs.readFileSync(filename)) === fileHashes[filename]) {
         return;
