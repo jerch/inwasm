@@ -7,8 +7,8 @@ export const custom = InWasm({
   mode: OutputMode.SYNC,
   srctype: 'custom',
   customRunner: (def, buildDir) => {
-    const cp = require('child_process');
-    const fs = require('fs');
+    const cp = require('node:child_process');
+    const fs = require('node:fs');
     if (process.platform === 'win32') {
       cp.execSync('cd custom && build.bat', { shell: 'cmd.exe', stdio: 'inherit' });
     } else {
