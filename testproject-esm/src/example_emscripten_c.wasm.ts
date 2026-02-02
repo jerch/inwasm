@@ -52,7 +52,6 @@ const convert_simd = InWasm({
     convert: (length: number) => 0,
     //memory: new WebAssembly.Memory({initial: 1, maximum: 1})
   },
-  memoryDescriptor: {initial: 1, maximum: 1},
   code: `
 static unsigned char CHUNK[CHUNK_SIZE] __attribute__((aligned(16)));
 static unsigned char TARGET[CHUNK_SIZE/2] __attribute__((aligned(16)));
@@ -103,7 +102,6 @@ const convert_scalar = InWasm({
     convert: (length: number) => 0,
     //memory: new WebAssembly.Memory({initial: 1, maximum: 1})
   },
-  memoryDescriptor: {initial: 1, maximum: 1},
   code: `
 static unsigned char CHUNK[CHUNK_SIZE] __attribute__((aligned(16)));
 static unsigned char TARGET[CHUNK_SIZE/2] __attribute__((aligned(16)));

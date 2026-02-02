@@ -30,22 +30,21 @@ export const enum OutputMode {
  * Wasm source definition, holds all relevant compiler info.
  */
 export interface IWasmDefinition {
-  // Name of the wasm target, should be unique.
+  /** Name of the wasm target, must be unique within a module. */
   name: string;
-  // Type determines, whether to provide bytes | module | instance at runtime.
+  /** Type determines, whether to provide bytes, module or an instance at runtime. */
   type: OutputType;
-  // Sync (discouraged) vs. async wasm bootstrapping at runtime.
+  /** Sync vs. async wasm bootstrapping at runtime. */
   mode: OutputMode,
-  // Exported wasm functions, for proper TS typing simply stub them.
+  /** Exported wasm functions, for proper TS typing simply stub them. */
   exports: { [key: string]: Function | WebAssembly.Global | WebAssembly.Memory };
-  // Name of the env import object (must be visible at runtime). Only used for OutputType.INSTANCE.
+  /** Stub of import object. Must match the real imports at runtime for OutputType.INSTANCE. */
   imports?: WebAssembly.Imports;
-  memoryDescriptor?: WebAssembly.MemoryDescriptor;
-  // whether to treat `code` below as C or C++ source.
+  /** Determines the compiler runner to be used. */
   srctype: 'C' | 'C++' | 'Clang-C' | 'Clang-C++' | 'Zig' | 'wat' | 'custom' | 'Rust';
-  // custom compiler settings
+  /** Custom compiler settings. */
   compile?: {
-    // Custom cmdline defines, e.g. {ABC: 123} provided as -DABC=123 to the compiler.
+    /** Custom cmdline defines, e.g. {xyz: 123} is provided as -Dxyz=123 to the compiler. */
     defines?: { [key: string]: string | number };
     // Additional include paths, should be absolute. (TODO...)
     // include?: string[];
@@ -53,15 +52,16 @@ export interface IWasmDefinition {
     // sources?: string[];
     // FIXME: check support for -lxy with wasm
     // libs?: string[],
-    // Custom cmdline switches, overriding any from above.
+    /** Custom cmdline switches, overrides any from above. */
     switches?: string[];
   };
+  /** Custom runner for srctype='custom'. */
   customRunner?: CompilerRunner;
-  // Inline source code (C or C++).
+  /** Inline source code. */
   code: string;
-  // Whether to always run compiler runner.
+  /** Whether to always run compiler runner. */
   noCache?: boolean;
-  // List of globbing entries to track additional files.
+  /** List of globbing entries to track additional files for changes. */
   trackChanges?: string[];
   /**
    * Hash mode for file tracking, default is 'mtime'.
@@ -300,14 +300,14 @@ export interface _IWasmCtx {
 }
 
 
-// runtime helper - decode base64
-function _dec(s: string): Uint8Array<ArrayBuffer> {
+let z = (s: string): Uint8Array<ArrayBuffer> => {
+  if ((Uint8Array as any).fromBase64) return (Uint8Array as any).fromBase64(s);
   if (typeof Buffer !== 'undefined') return Buffer.from(s, 'base64');
-  const bs = atob(s);
-  const r = new Uint8Array(bs.length);
-  for (let i = 0; i < r.length; ++i) r[i] = bs.charCodeAt(i);
+  const b = atob(s);
+  const r = new Uint8Array(b.length);
+  for (let i = 0; i < r.length; ++i) r[i] = b.charCodeAt(i);
   return r;
-}
+};
 
 
 // compiler ctx helper (only defined during compile run from inwasm)
@@ -338,9 +338,7 @@ declare const _wasmCtx: _IWasmCtx;
  * After TS compilation run `inwasm` on files containing `InWasm` calls.
  * `inwasm` grabs the source definitions from partial execution, compiles them into
  * wasm binaries and replaces the source definitions with base64 encoded runtime definitions.
- * Note that this currently happens inplace, thus the original file content gets overwritten.
  * Alternatively run `inwasm` in watch mode with `inwasm -w glob*pattern`.
- * Note: `inwasm` does not yet work with ES6 modules.
  *
  * runtime stage\
  * At runtime `InWasm` decodes the base64 wasm data and returns a function returning the
@@ -355,31 +353,26 @@ export function InWasm<T extends IWasmDefinitionSyncInstance>(def: T): (importOb
 export function InWasm<T extends IWasmDefinitionAsyncInstance>(def: T): (importObject?: WebAssembly.Imports) => Promise<IWasmInstance<T>>;
 export function InWasm<T extends IWasmDefinition>(def: T): any {
   if ((def as any).d) {
-    // default compiled call: wasm loading during runtime
-    // for the sake of small bundling size (<900 bytes) the code is somewhat degenerated
-    // see cli.ts for the meaning of the {t, s, d, e} object properties
     const { t, s, d } = def as any;
-    // memorize bytes and module
-    let bytes: IWasmBytes<T>;
-    let mod: IWasmModule<T>;
+    let b: IWasmBytes<T>;
+    let m: IWasmModule<T>;
     const W = WebAssembly;
-    if (t === OutputType.BYTES) {
-      if (s) return () => bytes || (bytes = _dec(d));
-      return () => Promise.resolve(bytes || (bytes = _dec(d)));
+    if (t === OutputType.INSTANCE) {
+      if (s)
+        return (e?: WebAssembly.Imports) => new W.Instance(m || (m = new W.Module(b || (b = z(d)))), e) as IWasmInstance<T>;
+      return (e?: WebAssembly.Imports) => m
+        ? W.instantiate(m, e) as Promise<IWasmInstance<T>>
+        : W.instantiate(b || (b = z(d)), e).then(r => (m = r.module) && r.instance as IWasmInstance<T>);
     }
     if (t === OutputType.MODULE) {
-      if (s) return () => mod || (mod = new W.Module(bytes || (bytes = _dec(d))));
-      return () => mod
-        ? Promise.resolve(mod)
-        : W.compile(bytes || (bytes = _dec(d))).then(m => mod = m as IWasmModule<T>);
+      if (s) return () => m || (m = new W.Module(b || (b = z(d))));
+      return () => m
+        ? Promise.resolve(m)
+        : W.compile(b || (b = z(d))).then(r => m = r as IWasmModule<T>);
     }
-    if (s)
-      return (e?: WebAssembly.Imports) => new W.Instance(mod || (mod = new W.Module(bytes || (bytes = _dec(d)))), e) as IWasmInstance<T>;
-    return (e?: WebAssembly.Imports) => mod
-      ? W.instantiate(mod, e) as Promise<IWasmInstance<T>>
-      : W.instantiate(bytes || (bytes = _dec(d)), e).then(r => (mod = r.module) && r.instance as IWasmInstance<T>);
+    if (s) return () => b || (b = z(d));
+    return () => Promise.resolve(b || (b = z(d)));
   }
-  // invalid call: uncompiled normal run throws
   if (typeof _wasmCtx === 'undefined') throw new Error('must run "inwasm"');
   _wasmCtx.add(def);
 }
