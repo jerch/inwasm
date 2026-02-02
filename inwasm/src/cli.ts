@@ -278,7 +278,7 @@ async function compileWasm(def: IWasmDefinition, filename: string, srcDef: strin
   const memorySettings = extractMemorySettings(def);
 
   // create build folders
-  const baseDir = path.resolve(path.join(PROJECT_ROOT, 'inwasm-builds'));
+  const baseDir = path.join(PROJECT_ROOT, 'inwasm-builds');
   if (!fs.existsSync(baseDir)) {
     fs.mkdirSync(baseDir);
   }
@@ -495,7 +495,7 @@ function reprocessSkipped(filename: string, id: string): boolean {
         }
         continue;
       }
-      const buildDir = path.join(path.resolve('./inwasm-builds'), filename, m.groups.name);
+      const buildDir = path.join(PROJECT_ROOT, 'inwasm-builds', filename, m.groups.name);
       if (!fs.existsSync(path.join(buildDir, 'definition.json'))) {
         // we lost the builddir for some reason?
         return false;
@@ -553,7 +553,7 @@ function updateForeignWatch(filename: string) {
   for (const comment of comments) {
     const m = comment.value.match(REX);
     if (m && m.groups.type === 'start') {
-      const buildDir = path.join(path.resolve('./inwasm-builds'), filename, m.groups.name);
+      const buildDir = path.join(PROJECT_ROOT, 'inwasm-builds', filename, m.groups.name);
       if (!fs.existsSync(path.join(buildDir, 'definition.json'))) {
         // we lost the builddir for some reason?
         continue;
@@ -596,6 +596,7 @@ function updateForeignWatch(filename: string) {
     watchers[filename].watcher.close();
   }
 
+  // FIXME: pattern match got removed from chokidar
   const watcher = chokidar.watch(Array.from(pattern));
   watcher.on('change', () => {
     try {
@@ -618,13 +619,14 @@ function updateForeignWatch(filename: string) {
 
 
 // default glob pattern
-const DEFAULT_GLOB = ['./**/*.wasm.js']
+const DEFAULT_GLOB = ['./lib/**/*.wasm.js']
 
 
 /**
  * Run in watch mode.
  */
 async function runWatcher(args: string[]) {
+  // FIXME: pattern match got removed from chokidar
   const pattern = args.length ? args : DEFAULT_GLOB;
   console.log(`Starting watch mode with pattern ${pattern.join(' ')}`);
 
