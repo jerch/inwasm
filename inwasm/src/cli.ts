@@ -704,6 +704,7 @@ async function runWatcher(args: string[]) {
     process.on('SIGINT', r);
     process.on('SIGQUIT', r);
     process.on('SIGTERM', r);
+    process.on('SIGKILL', r);
   });
 }
 

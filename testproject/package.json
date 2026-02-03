@@ -12,7 +12,9 @@
     "inwasm": "inwasm 'lib/*.wasm.js'",
     "bundle": "tsc && inwasm 'lib/*.wasm.js' && webpack",
     "clean": "rm -rf lib dist inwasm-builds",
-    "build": "npm run bundle"
+    "build": "npm run bundle",
+    "test-watch": "inwasm -w 'lib/tests/*.wasm.js'",
+    "test-watch-test": "mocha lib/tests/*.test.wasm.js"
   },
   "type": "commonjs",
   "repository": "https://github.com/jerch/wasm-dummy",
