@@ -596,8 +596,12 @@ function updateForeignWatch(filename: string, content: string) {
     watchers[filename].watcher.close();
   }
 
-  // FIXME: pattern match got removed from chokidar
-  const watcher = chokidar.watch(Array.from(pattern));
+  // glob initially
+  // TODO: limitation - on a new foreign file currently either
+  // - the watch script has to restart
+  // - source file with the InWasm def has to be changed
+  const files = globSync(Array.from(pattern));
+  const watcher = chokidar.watch(Array.from(files));
   watcher.on('change', () => {
     try {
       /**

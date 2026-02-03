@@ -21,7 +21,7 @@ export const custom = InWasm({
   },
   code: '',
   noCache: true,
-  trackChanges: ['custom/module.wat'],
+  trackChanges: ['custom/*.wat'],
   trackMode: 'content'
 })();
 
