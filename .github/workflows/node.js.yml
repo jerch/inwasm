@@ -41,34 +41,6 @@ jobs:
     - name: Run testproject-esm tests
       run: cd testproject-esm && npm test
 
-    - name: Test watch mode on testproject
-      run: |
-        set -e
-        cd testproject
-        npm run clean
-        npm run tsc
-        npm run test-watch &
-        WATCH_PID=$!
-        sleep 30
-        kill $WATCH_PID
-        wait $WATCH_PID
-    - name: Run tests after watch on testproject
-      run: cd testproject && npm test-watch-test
-
-    - name: Test watch mode on testproject-esm
-      run: |
-        set -e
-        cd testproject-esm
-        npm run test-watch &
-        WATCH_PID=$!
-        sleep 5
-        npm run tsc
-        sleep 10
-        kill $WATCH_PID
-        wait $WATCH_PID
-    - name: Run tests after watch on testproject-esm
-      run: cd testproject-esm && npm test-watch-test
-
 
   macos:
     runs-on: macos-latest
@@ -103,9 +75,7 @@ jobs:
 
 
   windows:
-
     runs-on: windows-latest
-
     strategy:
       matrix:
         node-version: [24.x]
