@@ -688,10 +688,8 @@ async function runWatcher(args: string[]) {
     ignored: ignoreFilter,
     ignoreInitial: true
   }).on('all', async (event, filename) => {
-    if (filename.includes(PROJECT_ROOT)) {
-      filename = filename.slice(PROJECT_ROOT.length + 1);
-    }
     if (['add', 'change'].includes(event)) {
+      filename = filename.slice(PROJECT_ROOT.length + 1);
       if (sha256(fs.readFileSync(filename)) === fileHashes[filename]) {
         return;
       }
