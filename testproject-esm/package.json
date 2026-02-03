@@ -4,13 +4,13 @@
   "description": "wasm/emscripten with typescript and npm bundling test",
   "main": "./lib/index.js",
   "scripts": {
-    "test": "inwasm 'lib/tests/*.wasm.js' && mocha lib/tests/*.test.wasm.js",
+    "test": "inwasm lib/tests/*.wasm.js && mocha lib/tests/*.test.wasm.js",
     "tsc": "tsc",
-    "watch": "tsc -w & inwasm -w 'lib/*.wasm.js' & wait",
+    "watch": "tsc -w & inwasm -w \"lib/*.wasm.js\" & wait",
     "start": "npm run bundle && http-server",
     "prepublish": "npm run build",
-    "inwasm": "inwasm 'lib/*.wasm.js'",
-    "bundle": "tsc && inwasm 'lib/*.wasm.js' && webpack",
+    "inwasm": "inwasm lib/*.wasm.js",
+    "bundle": "tsc && inwasm lib/*.wasm.js && webpack",
     "clean": "rm -rf lib dist inwasm-builds",
     "build": "npm run bundle"
   },

@@ -682,6 +682,9 @@ async function runWatcher(args: string[]) {
     ignored: ignoreFilter,
     ignoreInitial: true
   }).on('all', async (event, filename) => {
+    if (filename.includes(PROJECT_ROOT)) {
+      filename = filename.slice(PROJECT_ROOT.length + 1);
+    }
     if (['add', 'change'].includes(event)) {
       if (sha256(fs.readFileSync(filename)) === fileHashes[filename]) {
         return;
@@ -736,8 +739,26 @@ function extractSwitches(args: string[]): string[] {
   return args;
 }
 
+
+/**
+ * needed under windows if the npm script was declared with single quotes
+ * e.g. "inwasm 'lib/*.wasm.js'"
+ */
+function stripQuotes(args: string[]) {
+  for (let i = 0; i < args.length; ++i) {
+    if (args[i].length >= 2
+      && args[i].startsWith("'")
+      && args[i].endsWith("'")
+    ) {
+      args[i] = args[i].slice(1, -1);
+    }
+  }
+  return args;
+}
+
+
 async function main(): Promise<number> {
-  const args = extractSwitches(process.argv.slice(2));
+  const args = stripQuotes(extractSwitches(process.argv.slice(2)));
   if (SWITCHES.watch) {
     await runWatcher(args);
     return 0;
