@@ -601,7 +601,7 @@ function updateForeignWatch(filename: string, content: string) {
   // - the watch script has to restart
   // - source file with the InWasm def has to be changed
   const files = globSync(Array.from(pattern));
-  const watcher = chokidar.watch(Array.from(files));
+  const watcher = chokidar.watch(files);
   watcher.on('change', () => {
     try {
       /**
