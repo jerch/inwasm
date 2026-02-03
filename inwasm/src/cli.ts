@@ -413,12 +413,12 @@ function isESM(filename: string, code: string): boolean {
 /**
  * Process a single source file.
  */
-async function processFile(filename: string, id: string) {
+async function processFile(filename: string, id: string): Promise<string> {
   let handledUnits: string[] = [];
   let lastStackFrame: IStackFrameInfo = { at: '', unit: '', line: -1, column: -1 };
   // read file content, exit early if no InWasm was found at all
   let content = fs.readFileSync(filename, { encoding: 'utf-8' });
-  if (content.indexOf('InWasm') === -1) return;
+  if (content.indexOf('InWasm') === -1) return content;
 
   // loop until all InWasmReadExit errors are resolved
   while (true) {
@@ -472,11 +472,11 @@ async function processFile(filename: string, id: string) {
     // re-read content
     content = fs.readFileSync(filename, { encoding: 'utf-8' });
   }
+  return content;
 }
 
 
-function reprocessSkipped(filename: string, id: string): boolean {
-  let content = fs.readFileSync(filename, { encoding: 'utf-8' });
+function reprocessSkipped(filename: string, id: string, content: string): boolean {
   if (content.indexOf('InWasm') === -1) return false;
 
   // collect comments from source
@@ -539,8 +539,7 @@ interface IPatternWatcher {
 const watchers: {[key: string]: IPatternWatcher} = {};
 
 
-function updateForeignWatch(filename: string) {
-  let content = fs.readFileSync(filename, { encoding: 'utf-8' });
+function updateForeignWatch(filename: string, content: string) {
   if (content.indexOf('InWasm') === -1) return false;
 
   // collect comments from source
@@ -606,7 +605,8 @@ function updateForeignWatch(filename: string) {
        * - already built targets by reprocessSkipped
        * - uncompiled targets by explicit mtime change
        */
-      if (!reprocessSkipped(filename, randomId(8))) {
+      const content = fs.readFileSync(filename, { encoding: 'utf-8' });
+      if (!reprocessSkipped(filename, randomId(8), content)) {
         const t = new Date();
         fs.utimesSync(filename, t, t);
       }
@@ -670,18 +670,27 @@ function ignoreFilter(filename: string): boolean {
  */
 async function runWatcher(args: string[]) {
   const pattern = args.length ? args : DEFAULT_GLOB;
+  const fileHashes: {[key: string]: string} = {};
+  let content = '';
 
   // run once for initial compile
-  try {
-    await run(pattern);
-  } catch (e) {}
+  const files = globSync(args);
+  for (const filename of files) {
+    try {
+      const id = randomId(8);
+      do {
+        content = await processFile(filename, id);
+      } while (reprocessSkipped(filename, id, content));
+      fileHashes[filename] = sha256(content);
+      updateForeignWatch(filename, content);
+    } catch (e) {}
+  }
 
   console.log(`\nStarting watch mode with pattern ${pattern.join(' ')}`);
   for (const pat of pattern) {
     globMatchers.push(new Minimatch(pat));
   }
 
-  const fileHashes: {[key: string]: string} = {};
   chokidar.watch(PROJECT_ROOT, {
     atomic: true,
     awaitWriteFinish: true,
@@ -696,10 +705,10 @@ async function runWatcher(args: string[]) {
       try {
         const id = randomId(8);
         do {
-          await processFile(filename, id);
-        } while (reprocessSkipped(filename, id));
+          content = await processFile(filename, id);
+        } while (reprocessSkipped(filename, id, content));
         fileHashes[filename] = sha256(fs.readFileSync(filename));
-        updateForeignWatch(filename);
+        updateForeignWatch(filename, content);
       } catch (e) {}
       console.log('\n\n');
     }
@@ -767,11 +776,12 @@ function stripQuotes(args: string[]) {
 async function run(args: string[]) {
   const startTime = Date.now();
   const files = globSync(args);
+  let content = '';
   for (const filename of files) {
     const id = randomId(8);
     do {
-      await processFile(filename, id);
-    } while (reprocessSkipped(filename, id));
+      content = await processFile(filename, id);
+    } while (reprocessSkipped(filename, id, content));
   }
   console.log(green('[inwasm]'), `Finished in ${Date.now() - startTime} msec.\n`);
 }
