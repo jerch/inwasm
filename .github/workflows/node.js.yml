@@ -62,10 +62,9 @@ jobs:
       run: |
         set -e
         cd testproject-esm
-        npm run clean
-        npm run tsc
         npm run test-watch &
         WATCH_PID=$!
+        npm run tsc
         sleep 30
         kill $WATCH_PID
         wait $WATCH_PID || {
