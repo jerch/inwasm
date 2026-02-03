@@ -670,7 +670,13 @@ function ignoreFilter(filename: string): boolean {
  */
 async function runWatcher(args: string[]) {
   const pattern = args.length ? args : DEFAULT_GLOB;
-  console.log(`Starting watch mode with pattern ${pattern.join(' ')}`);
+
+  // run once for initial compile
+  try {
+    await run(pattern);
+  } catch (e) {}
+
+  console.log(`\nStarting watch mode with pattern ${pattern.join(' ')}`);
   for (const pat of pattern) {
     globMatchers.push(new Minimatch(pat));
   }
@@ -757,6 +763,22 @@ function stripQuotes(args: string[]) {
 }
 
 
+/**
+ * Normal direct run.
+ */
+async function run(args: string[]) {
+  const startTime = Date.now();
+  const files = globSync(args);
+  for (const filename of files) {
+    const id = randomId(8);
+    do {
+      await processFile(filename, id);
+    } while (reprocessSkipped(filename, id));
+  }
+  console.log(green('[inwasm]'), `Finished in ${Date.now() - startTime} msec.\n`);
+}
+
+
 async function main(): Promise<number> {
   const args = stripQuotes(extractSwitches(process.argv.slice(2)));
   if (SWITCHES.watch) {
@@ -767,23 +789,14 @@ async function main(): Promise<number> {
     console.log(`usage: inwasm [-wfS] files|glob`);
     return 1;
   }
-  // minimal globbing support to work around window shell limitations
-  const files = args.length === 1 && hasMagic(args, { magicalBraces: true })
-    ? globSync(args[0])
-    : args;
-  const startTime = Date.now();
-  for (const filename of files) {
-    const id = randomId(8);
-    do {
-      await processFile(filename, id);
-    } while (reprocessSkipped(filename, id));
-  }
-  console.log(green('[inwasm]'), `Finished in ${Date.now() - startTime} msec.\n`);
+  await run(args);
   return 0;
 }
 
-// handle exit code from promise resolve
-main().then(
-  () => process.exit(0),
-  err => { console.error(err); process.exit(1); }
-);
+
+try {
+  process.exit(await main());
+} catch (e) {
+  console.error(e);
+  process.exit(1);
+}
