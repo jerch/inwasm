@@ -102,7 +102,7 @@ function getAppRoot(): string {
     folder = path.dirname(folder);
   }
   if (!found) throw new Error('cannot determine inwasm app root path');
-  return found;
+  return path.resolve(found);
 }
 export const APP_ROOT = getAppRoot();
 
@@ -121,7 +121,7 @@ function getProjectRoot(): string {
     folder = path.dirname(folder);
   }
   if (!found) throw new Error('cannot determine project root path');
-  return found;
+  return path.resolve(found);
 }
 export const PROJECT_ROOT = getProjectRoot();
 

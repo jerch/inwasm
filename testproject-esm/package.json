@@ -6,13 +6,15 @@
   "scripts": {
     "test": "inwasm lib/tests/*.wasm.js && mocha lib/tests/*.test.wasm.js",
     "tsc": "tsc",
-    "watch": "tsc -w & inwasm -w lib/*.wasm.js & wait",
+    "watch": "tsc -w & inwasm -w \"lib/*.wasm.js\" & wait",
     "start": "npm run bundle && http-server",
     "prepublish": "npm run build",
     "inwasm": "inwasm lib/*.wasm.js",
     "bundle": "tsc && inwasm lib/*.wasm.js && webpack",
     "clean": "rm -rf lib dist inwasm-builds",
-    "build": "npm run bundle"
+    "build": "npm run bundle",
+    "test-watch": "inwasm -w \"lib/*.wasm.js\"",
+    "test-watch-test": "mocha lib/tests/*.test.wasm.js"
   },
   "type": "module",
   "repository": "https://github.com/jerch/wasm-dummy",
@@ -22,7 +24,7 @@
     "@types/mocha": "^10.0.10",
     "@types/node": "^24.10.9",
     "http-server": "^14.1.1",
-    "inwasm": "file:../inwasm/inwasm-0.1.1.tgz",
+    "inwasm": "file:../inwasm",
     "mocha": "^11.7.5",
     "source-map-loader": "^5.0.0",
     "source-map-support": "^0.5.21",
@@ -32,6 +34,6 @@
     "webpack-cli": "^6.0.1"
   },
   "dependencies": {
-    "inwasm-runtime": "file:../inwasm/runtime/inwasm-runtime-0.1.1.tgz"
+    "inwasm-runtime": "file:../inwasm/runtime"
   }
 }

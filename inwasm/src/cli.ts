@@ -15,6 +15,7 @@ import { type IWasmDefinition, type CompilerRunner, type _IWasmCtx, OutputMode, 
 
 import * as chokidar from 'chokidar';
 import { globSync, hasMagic } from 'glob';
+import { Minimatch } from 'minimatch';
 
 import * as acorn from 'acorn';
 import * as walk from 'acorn-walk';
@@ -278,7 +279,7 @@ async function compileWasm(def: IWasmDefinition, filename: string, srcDef: strin
   const memorySettings = extractMemorySettings(def);
 
   // create build folders
-  const baseDir = path.resolve(path.join(PROJECT_ROOT, 'inwasm-builds'));
+  const baseDir = path.join(PROJECT_ROOT, 'inwasm-builds');
   if (!fs.existsSync(baseDir)) {
     fs.mkdirSync(baseDir);
   }
@@ -412,12 +413,12 @@ function isESM(filename: string, code: string): boolean {
 /**
  * Process a single source file.
  */
-async function processFile(filename: string, id: string) {
+async function processFile(filename: string, id: string): Promise<string> {
   let handledUnits: string[] = [];
   let lastStackFrame: IStackFrameInfo = { at: '', unit: '', line: -1, column: -1 };
   // read file content, exit early if no InWasm was found at all
   let content = fs.readFileSync(filename, { encoding: 'utf-8' });
-  if (content.indexOf('InWasm') === -1) return;
+  if (content.indexOf('InWasm') === -1) return content;
 
   // loop until all InWasmReadExit errors are resolved
   while (true) {
@@ -471,11 +472,11 @@ async function processFile(filename: string, id: string) {
     // re-read content
     content = fs.readFileSync(filename, { encoding: 'utf-8' });
   }
+  return content;
 }
 
 
-function reprocessSkipped(filename: string, id: string): boolean {
-  let content = fs.readFileSync(filename, { encoding: 'utf-8' });
+function reprocessSkipped(filename: string, id: string, content: string): boolean {
   if (content.indexOf('InWasm') === -1) return false;
 
   // collect comments from source
@@ -495,7 +496,7 @@ function reprocessSkipped(filename: string, id: string): boolean {
         }
         continue;
       }
-      const buildDir = path.join(path.resolve('./inwasm-builds'), filename, m.groups.name);
+      const buildDir = path.join(PROJECT_ROOT, 'inwasm-builds', filename, m.groups.name);
       if (!fs.existsSync(path.join(buildDir, 'definition.json'))) {
         // we lost the builddir for some reason?
         return false;
@@ -538,8 +539,7 @@ interface IPatternWatcher {
 const watchers: {[key: string]: IPatternWatcher} = {};
 
 
-function updateForeignWatch(filename: string) {
-  let content = fs.readFileSync(filename, { encoding: 'utf-8' });
+function updateForeignWatch(filename: string, content: string) {
   if (content.indexOf('InWasm') === -1) return false;
 
   // collect comments from source
@@ -553,7 +553,7 @@ function updateForeignWatch(filename: string) {
   for (const comment of comments) {
     const m = comment.value.match(REX);
     if (m && m.groups.type === 'start') {
-      const buildDir = path.join(path.resolve('./inwasm-builds'), filename, m.groups.name);
+      const buildDir = path.join(PROJECT_ROOT, 'inwasm-builds', filename, m.groups.name);
       if (!fs.existsSync(path.join(buildDir, 'definition.json'))) {
         // we lost the builddir for some reason?
         continue;
@@ -596,7 +596,12 @@ function updateForeignWatch(filename: string) {
     watchers[filename].watcher.close();
   }
 
-  const watcher = chokidar.watch(Array.from(pattern));
+  // glob initially
+  // TODO: limitation - on a new foreign file currently either
+  // - the watch script has to restart
+  // - source file with the InWasm def has to be changed
+  const files = globSync(Array.from(pattern));
+  const watcher = chokidar.watch(Array.from(files));
   watcher.on('change', () => {
     try {
       /**
@@ -604,7 +609,8 @@ function updateForeignWatch(filename: string) {
        * - already built targets by reprocessSkipped
        * - uncompiled targets by explicit mtime change
        */
-      if (!reprocessSkipped(filename, randomId(8))) {
+      const content = fs.readFileSync(filename, { encoding: 'utf-8' });
+      if (!reprocessSkipped(filename, randomId(8), content)) {
         const t = new Date();
         fs.utimesSync(filename, t, t);
       }
@@ -618,29 +624,95 @@ function updateForeignWatch(filename: string) {
 
 
 // default glob pattern
-const DEFAULT_GLOB = ['./**/*.wasm.js']
+// TODO: config file entries
+const DEFAULT_GLOB = ['lib/**/*.wasm.js'];
 
+// always exclude filenames containing these subpaths
+const EXCLUDE_FOLDERS = [
+  'node_modules',
+  'inwasm-sdks',
+  'inwasm-builds'
+];
+
+// glob pattern matchers for watch mode
+const globMatchers: Minimatch[] = [];
+
+/**
+ * Test whether a file path from chokidar matches
+ * the glob pattern.
+ */
+function matchesPattern(filename: string): boolean {
+  // glob pattern are relative to project local
+  filename = filename.slice(PROJECT_ROOT.length + 1);
+  for (const mm of globMatchers) {
+    if (mm.match(filename)) return true;
+  }
+  return false;
+}
+
+/**
+ * Ignore filter for watch mode chokidar.
+ * - folders always pass
+ * - file must match one of the glob pattern
+ * - everything else is rejected
+ */
+function ignoreFilter(filename: string): boolean {
+  //
+  try {
+    for (const exclude of EXCLUDE_FOLDERS) {
+      if (filename.includes(exclude)) return true;
+    }
+    if (fs.statSync(filename).isFile()
+      && !matchesPattern(filename)) return true;
+    return false;
+  } catch (e) {}
+  return true;
+}
 
 /**
  * Run in watch mode.
  */
 async function runWatcher(args: string[]) {
   const pattern = args.length ? args : DEFAULT_GLOB;
-  console.log(`Starting watch mode with pattern ${pattern.join(' ')}`);
-
   const fileHashes: {[key: string]: string} = {};
-  chokidar.watch(pattern, { atomic: true, awaitWriteFinish: true }).on('all', async (event, filename) => {
+  let content = '';
+
+  // run once for initial compile
+  const files = globSync(args);
+  for (const filename of files) {
+    try {
+      const id = randomId(8);
+      do {
+        content = await processFile(filename, id);
+      } while (reprocessSkipped(filename, id, content));
+      fileHashes[filename] = sha256(content);
+      updateForeignWatch(filename, content);
+    } catch (e) {}
+  }
+
+  console.log(`\nStarting watch mode with pattern ${pattern.join(' ')}`);
+  for (const pat of pattern) {
+    globMatchers.push(new Minimatch(pat));
+  }
+
+  chokidar.watch(PROJECT_ROOT, {
+    atomic: true,
+    awaitWriteFinish: true,
+    ignored: ignoreFilter,
+    ignoreInitial: true
+  }).on('all', async (event, filename) => {
     if (['add', 'change'].includes(event)) {
+      filename = filename.slice(PROJECT_ROOT.length + 1);
       if (sha256(fs.readFileSync(filename)) === fileHashes[filename]) {
         return;
       }
       try {
         const id = randomId(8);
         do {
-          await processFile(filename, id);
-        } while (reprocessSkipped(filename, id));
+          content = await processFile(filename, id);
+        } while (reprocessSkipped(filename, id, content));
         fileHashes[filename] = sha256(fs.readFileSync(filename));
-        updateForeignWatch(filename);
+        updateForeignWatch(filename, content);
       } catch (e) {}
       console.log('\n\n');
     }
@@ -684,8 +756,43 @@ function extractSwitches(args: string[]): string[] {
   return args;
 }
 
+
+/**
+ * needed under windows if the npm script was declared with single quotes
+ * e.g. "inwasm 'lib/*.wasm.js'"
+ */
+function stripQuotes(args: string[]) {
+  for (let i = 0; i < args.length; ++i) {
+    if (args[i].length >= 2
+      && args[i].startsWith("'")
+      && args[i].endsWith("'")
+    ) {
+      args[i] = args[i].slice(1, -1);
+    }
+  }
+  return args;
+}
+
+
+/**
+ * Normal direct run.
+ */
+async function run(args: string[]) {
+  const startTime = Date.now();
+  const files = globSync(args);
+  let content = '';
+  for (const filename of files) {
+    const id = randomId(8);
+    do {
+      content = await processFile(filename, id);
+    } while (reprocessSkipped(filename, id, content));
+  }
+  console.log(green('[inwasm]'), `Finished in ${Date.now() - startTime} msec.\n`);
+}
+
+
 async function main(): Promise<number> {
-  const args = extractSwitches(process.argv.slice(2));
+  const args = stripQuotes(extractSwitches(process.argv.slice(2)));
   if (SWITCHES.watch) {
     await runWatcher(args);
     return 0;
@@ -694,23 +801,14 @@ async function main(): Promise<number> {
     console.log(`usage: inwasm [-wfS] files|glob`);
     return 1;
   }
-  // minimal globbing support to work around window shell limitations
-  const files = args.length === 1 && hasMagic(args, { magicalBraces: true })
-    ? globSync(args[0])
-    : args;
-  const startTime = Date.now();
-  for (const filename of files) {
-    const id = randomId(8);
-    do {
-      await processFile(filename, id);
-    } while (reprocessSkipped(filename, id));
-  }
-  console.log(green('[inwasm]'), `Finished in ${Date.now() - startTime} msec.\n`);
+  await run(args);
   return 0;
 }
 
-// handle exit code from promise resolve
-main().then(
-  () => process.exit(0),
-  err => { console.error(err); process.exit(1); }
-);
+
+try {
+  process.exit(await main());
+} catch (e) {
+  console.error(e);
+  process.exit(1);
+}
