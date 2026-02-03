@@ -64,8 +64,9 @@ jobs:
         cd testproject-esm
         npm run test-watch &
         WATCH_PID=$!
+        sleep 5
         npm run tsc
-        sleep 30
+        sleep 10
         kill $WATCH_PID
         wait $WATCH_PID || {
           echo "Watch process exited with error"
