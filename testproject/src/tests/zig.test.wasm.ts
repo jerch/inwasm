@@ -86,7 +86,7 @@ describe('zig', () => {
           load: (pos: number) => 0
         },
         code: `
-        var SOME_STATIC = [_]i32{0} ** 10;
+        var SOME_STATIC: [10]i32 = @splat(0);
         export fn store(pos: u32, value: i32) void {
           SOME_STATIC[pos] = value;
         }
@@ -116,7 +116,7 @@ describe('zig', () => {
           load: (pos: number) => 0
         },
         code: `
-        var SOME_STATIC = [_]i32{0} ** 10;
+        var SOME_STATIC: [10]i32 = @splat(0);
         export fn store(pos: u32, value: i32) void {
           SOME_STATIC[pos] = value;
         }
