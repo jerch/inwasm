@@ -56,7 +56,7 @@ The final JS file can be further processed or distributed as any other JS script
 
 ### How does it work internally?
 
-The compile script `inwasm` loads the JS files as normal module (currently no ESM support!)
+The compile script `inwasm` loads the JS files as normal module
 and catches errors thown by `InWasm` to get a hold of the callstack and the source code positions.
 Next it evaluates the provided wasm definition (thats the literal object argument of `InWasm`)
 and calls the compiler backend for the `srctype` with the content of `code`.
