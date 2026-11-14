@@ -53,10 +53,10 @@
   "dependencies": {
     "acorn": "^8.15.0",
     "acorn-walk": "^8.3.4",
-    "chokidar": "^5.0.0",
+    "chokidar": "^6.0.0",
     "colorette": "^2.0.20",
-    "glob": "^13.0.6",
-    "minimatch": "^10.2.3",
+    "glob": "^14.0.6",
+    "minimatch": "^11.0.8",
     "wabt": "^1.0.39"
   }
 }
