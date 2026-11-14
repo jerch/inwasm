@@ -687,7 +687,9 @@ async function runWatcher(args: string[]) {
       } while (reprocessSkipped(filename, id, content));
       fileHashes[filename] = sha256(content);
       updateForeignWatch(filename, content);
-    } catch (e) {}
+    } catch (e) {
+      console.error(`Error while processing ${filename}:`, e);
+    }
   }
 
   console.log(`\nStarting watch mode with pattern ${pattern.join(' ')}`);
@@ -713,7 +715,9 @@ async function runWatcher(args: string[]) {
         } while (reprocessSkipped(filename, id, content));
         fileHashes[filename] = sha256(fs.readFileSync(filename));
         updateForeignWatch(filename, content);
-      } catch (e) {}
+      } catch (e) {
+        console.error(`Error while processing ${filename}:`, e);
+      }
       console.log('\n\n');
     }
   });
