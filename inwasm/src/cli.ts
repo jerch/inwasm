@@ -678,7 +678,7 @@ async function runWatcher(args: string[]) {
   let content = '';
 
   // run once for initial compile
-  const files = globSync(args);
+  const files = globSync(pattern);
   for (const filename of files) {
     try {
       const id = randomId(8);
