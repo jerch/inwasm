@@ -38,8 +38,11 @@ export function getEmscriptenPath(): string {
   console.log(`\n[emscripten.checkout] Cloning emscripten...`);
   cp.execSync(`git clone https://github.com/emscripten-core/emsdk.git ${basePath}`, {shell: SHELL, stdio: 'inherit'});
   console.log(`\n[emscripten.version] Activate version: "${emsdkConf.version}"`);
+  const emsdkBin = isPosix
+    ? `"${path.join(basePath, 'emsdk')}"`
+    : `call "${path.join(basePath, 'emsdk.bat')}"`;
   cp.execSync(
-    `${basePath}/emsdk install ${emsdkConf.version} && ${basePath}/emsdk activate ${emsdkConf.version}`,
+    `${emsdkBin} install ${emsdkConf.version} && ${emsdkBin} activate ${emsdkConf.version}`,
     {shell: SHELL, stdio: 'inherit'}
   );
 
@@ -64,8 +67,9 @@ export function getClangBinPath(): string {
  */
 export function emscriptenRun(cmd: string) {
   const sdkPath = getEmscriptenPath();
-  const sdk = isPosix
-    ? `source ${path.join(sdkPath, 'emsdk_env.sh')} > /dev/null 2>&1`
-    : `${path.join(sdkPath, 'emsdk_env.bat')} >nul 2>&1`;
-  cp.execSync(`${sdk} && ${cmd}`, {shell: SHELL, stdio: 'inherit'});
+  if (isPosix) {
+    cp.execSync(`source ${path.join(sdkPath, 'emsdk_env.sh')} > /dev/null 2>&1 && ${cmd}`, {shell: SHELL, stdio: 'inherit'});
+  } else {
+    cp.execSync(`cmd /v:on /c "call ${path.join(sdkPath, 'emsdk_env.bat')} >nul 2>&1 && ${cmd}"`, {stdio: 'inherit'});
+  }
 }

@@ -9,7 +9,8 @@
     "declaration": true,
     "noImplicitAny": true,
     "strict": true,
-    "removeComments": false
+    "removeComments": false,
+    "types": ["node"]
   },
   "exclude": [
     "node_modules",
