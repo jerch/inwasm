@@ -53,7 +53,7 @@ export default function(def: IWasmDefinition, buildDir: string, filename: string
   // for unknown reason windows shell cannot find emcc, thus give path explicitly
   const bin = isPosix
     ? 'emcc'
-    : `%EMSDK_PYTHON% ${path.join(getEmscriptenPath(), 'upstream', 'emscripten', 'emcc.py')}`;
+    : `!EMSDK_PYTHON! ${path.join(getEmscriptenPath(), 'upstream', 'emscripten', 'emcc.py')}`;
   const call = `${bin} ${opt} ${defines} ${funcs} ${switches.join(' ')} --no-entry ${src} -o ${target}`;
   console.log(`\n[c.run] ${call}`);
   emscriptenRun(call);

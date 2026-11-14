@@ -67,8 +67,9 @@ export function getClangBinPath(): string {
  */
 export function emscriptenRun(cmd: string) {
   const sdkPath = getEmscriptenPath();
-  const sdk = isPosix
-    ? `source "${path.join(sdkPath, 'emsdk_env.sh')}" > /dev/null 2>&1`
-    : `call ${path.join(sdkPath, 'emsdk_env.bat')} >nul 2>&1`;
-  cp.execSync(`${sdk} && ${cmd}`, {shell: SHELL, stdio: 'inherit'});
+  if (isPosix) {
+    cp.execSync(`source ${path.join(sdkPath, 'emsdk_env.sh')} > /dev/null 2>&1 && ${cmd}`, {shell: SHELL, stdio: 'inherit'});
+  } else {
+    cp.execSync(`cmd /v:on /c "call ${path.join(sdkPath, 'emsdk_env.bat')} >nul 2>&1 && ${cmd}"`, {stdio: 'inherit'});
+  }
 }
