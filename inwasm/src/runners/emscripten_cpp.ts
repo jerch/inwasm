@@ -51,7 +51,9 @@ export default function(def: IWasmDefinition, buildDir: string, filename: string
 
   const funcs = `-s EXPORTED_FUNCTIONS=${_funcs}`;
   // for unknown reason windows shell cannot find emcc, thus give path explicitly
-  const bin = isPosix ? 'em++' : 'call em++.bat';
+  const bin = isPosix
+    ? 'em++'
+    : `call "${path.join(getEmscriptenPath(), 'upstream', 'emscripten', 'em++.bat')}"`;
   const call = `${bin} ${opt} ${defines} ${funcs} ${switches.join(' ')} --no-entry ${src} -o ${target}`;
   console.log(`\n[cpp.run] ${call}`);
   emscriptenRun(call);
